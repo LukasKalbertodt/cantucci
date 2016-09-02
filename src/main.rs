@@ -3,8 +3,8 @@ extern crate minifb;
 
 use minifb::{Key, WindowOptions, Scale, Window};
 
-const WIDTH: usize = 500;
-const HEIGHT: usize = 500;
+const WIDTH: usize = 400;
+const HEIGHT: usize = 400;
 
 fn main() {
     let win_opt = WindowOptions {
