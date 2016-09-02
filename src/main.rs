@@ -1,7 +1,7 @@
 extern crate core;
 extern crate minifb;
 
-use minifb::{Key, Scale, WindowOptions, Window};
+use minifb::{Key, WindowOptions, Window};
 
 const WIDTH: usize = 1280;
 const HEIGHT: usize = 720;

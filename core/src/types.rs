@@ -61,6 +61,14 @@ impl Color {
     gen_color_ctor!(green =>   0, 255,   0);
     gen_color_ctor!(blue  =>   0,   0, 255);
 
+    pub fn greyscale(level: u8) -> Self {
+        Color {
+            r: level,
+            g: level,
+            b: level,
+        }
+    }
+
     pub fn to_u32(&self) -> u32 {
         (self.r as u32) << (2 * 8) |
         (self.g as u32) << (1 * 8) |
