@@ -12,11 +12,21 @@ pub struct PixelImage {
 }
 
 impl PixelImage {
-    pub fn black(width: usize, height: usize) -> Self {
+    pub fn monochrome(width: usize, height: usize, color: Color) -> Self {
         PixelImage {
             width: width,
             height: height,
-            data: vec![Color::black(); width * height],
+            data: vec![color; width * height],
+        }
+    }
+
+    pub fn from_pixels<F>(width: usize, height: usize, mut func: F) -> Self
+        where F: FnMut(usize, usize) -> Color
+    {
+        PixelImage {
+            width: width,
+            height: height,
+            data: (0..width*height).map(|i| func(i % width, i / width)).collect(),
         }
     }
 
@@ -32,14 +42,24 @@ pub struct Color {
     pub b: u8,
 }
 
-impl Color {
-    pub fn black() -> Self {
-        Color {
-            r: 0,
-            g: 0,
-            b: 0,
+macro_rules! gen_color_ctor {
+    ($name:ident => $r:expr, $g:expr, $b:expr) => {
+        pub fn $name() -> Self {
+            Color {
+                r: $r,
+                g: $g,
+                b: $b,
+            }
         }
     }
+}
+
+impl Color {
+    gen_color_ctor!(black =>   0,   0,   0);
+    gen_color_ctor!(white => 255, 255, 255);
+    gen_color_ctor!(red   => 255,   0,   0);
+    gen_color_ctor!(green =>   0, 255,   0);
+    gen_color_ctor!(blue  =>   0,   0, 255);
 
     pub fn to_u32(&self) -> u32 {
         (self.r as u32) << (2 * 8) |
