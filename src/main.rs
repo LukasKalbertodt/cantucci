@@ -1,13 +1,18 @@
 extern crate core;
 extern crate minifb;
 
-use minifb::{Key, WindowOptions, Window};
+use minifb::{Key, WindowOptions, Scale, Window};
 
-const WIDTH: usize = 1280;
-const HEIGHT: usize = 720;
+const WIDTH: usize = 500;
+const HEIGHT: usize = 500;
 
 fn main() {
-    let mut window = Window::new("Cantucci", WIDTH, HEIGHT, WindowOptions::default())
+    let win_opt = WindowOptions {
+        scale: Scale::X2,
+        .. WindowOptions::default()
+    };
+
+    let mut window = Window::new("Cantucci", WIDTH, HEIGHT, win_opt)
         .expect("Unable to create window");
 
     window.update();
