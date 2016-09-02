@@ -5,6 +5,19 @@ Or rather: it hopefully *will* be.
 This project is very much **WIP**.
 Come back later :honeybee: :blush:
 
+### Planned features
+
+This project is in its very beginning, so there are no concrete plans yet. 
+However, we want to have two renderers: a traditional raytracer (rather raymarcher) and a real time rasterizer. 
+The latter one works on a dynamically triangulated version of the fractal and will use OpenGL or Vulkan.
+
+The user should be able to fly around with the camera (with the real time renderer) and render specific images with the raymarcher.
+
+### Origin of the name
+
+The most famous fractal is without doubt the [Mandelbrot set](https://en.wikipedia.org/wiki/Mandelbrot_set). Its name stems from its discoverer [Benoit Mandelbrot](https://en.wikipedia.org/wiki/Benoit_Mandelbrot). "Mandelbrot" is a German word which literally translates to "almond bread" and refers to [this Italian pastry](https://en.wikipedia.org/wiki/Biscotti) ... which is sometimes called "Cantucci".
+
+---
 
 ## License
 
