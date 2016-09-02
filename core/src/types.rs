@@ -1,5 +1,7 @@
 
-///
+/// Represents a 2D-matrix of `Color`s. This is only used to save the final
+/// result and show it on the screen. The data is saved contiguous line by
+/// line:
 ///
 ///  [0] [1] [2]
 ///  [3] [4] [5]

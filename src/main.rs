@@ -18,5 +18,6 @@ fn main() {
         let buffer = image.to_u32_buffer();
 
         window.update_with_buffer(&buffer);
+        println!("wup");
     }
 }
