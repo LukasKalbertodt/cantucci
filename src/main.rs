@@ -3,8 +3,8 @@ extern crate minifb;
 
 use minifb::{Key, WindowOptions, Scale, Window};
 
-const WIDTH: usize = 400;
-const HEIGHT: usize = 400;
+const WIDTH: usize = 500;
+const HEIGHT: usize = 500;
 
 fn main() {
     let win_opt = WindowOptions {
@@ -17,12 +17,16 @@ fn main() {
 
     window.update();
 
+    let mut angle = 0.0;
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let (width, height) = (WIDTH, HEIGHT);
-        let image = core::get_circle(width, height);
+        let image = core::get_circle(width, height, angle);
         let buffer = image.to_u32_buffer();
 
         window.update_with_buffer(&buffer);
         println!("wup");
+
+        angle += 0.1;
     }
 }

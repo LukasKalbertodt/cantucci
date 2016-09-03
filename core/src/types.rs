@@ -1,3 +1,6 @@
+use rayon::par_iter::IntoParallelIterator;
+use rayon::par_iter::ParallelIterator;
+use rayon::par_iter::ExactParallelIterator;
 
 /// Represents a 2D-matrix of `Color`s. This is only used to save the final
 /// result and show it on the screen. The data is saved contiguous line by
@@ -22,13 +25,19 @@ impl PixelImage {
         }
     }
 
-    pub fn from_pixels<F>(width: usize, height: usize, mut func: F) -> Self
-        where F: FnMut(usize, usize) -> Color
+    pub fn from_pixels<F>(width: usize, height: usize, func: F) -> Self
+        where F: Fn(usize, usize) -> Color + Sync
     {
+        let mut data = Vec::with_capacity(width * height);
+
+        (0..width*height)
+            .into_par_iter()
+            .map(|i| func(i % width, i / width)).collect_into(&mut data);
+
         PixelImage {
             width: width,
             height: height,
-            data: (0..width*height).map(|i| func(i % width, i / width)).collect(),
+            data: data,
         }
     }
 
