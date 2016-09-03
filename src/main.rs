@@ -1,32 +1,33 @@
 extern crate core;
-extern crate minifb;
+#[macro_use]
+extern crate glium;
 
-use minifb::{Key, WindowOptions, Scale, Window};
+use glium::glutin::{Event, VirtualKeyCode};
 
-const WIDTH: usize = 500;
-const HEIGHT: usize = 500;
+mod mesh;
+
+use mesh::FractalMesh;
+
 
 fn main() {
-    let win_opt = WindowOptions {
-        scale: Scale::X2,
-        .. WindowOptions::default()
-    };
+    use glium::{DisplayBuild, Surface};
+    let display = glium::glutin::WindowBuilder::new().build_glium().unwrap();
+    let mesh = FractalMesh::new(&display);
 
-    let mut window = Window::new("Cantucci", WIDTH, HEIGHT, win_opt)
-        .expect("Unable to create window");
+    loop {
+        let mut target = display.draw();
+        target.clear_color(0.0, 0.0, 1.0, 1.0);
 
-    window.update();
+        mesh.draw(&mut target);
 
-    let mut angle = 0.0;
+        target.finish().unwrap();
 
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        let (width, height) = (WIDTH, HEIGHT);
-        let image = core::get_circle(width, height, angle);
-        let buffer = image.to_u32_buffer();
-
-        window.update_with_buffer(&buffer);
-        println!("wup");
-
-        angle += 0.1;
+        for ev in display.poll_events() {
+            match ev {
+                Event::Closed => return,
+                Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => return,
+                _ => ()
+            }
+        }
     }
 }

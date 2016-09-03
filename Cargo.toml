@@ -8,4 +8,4 @@ authors = [
 
 [dependencies]
 core = { path = "core/" }
-minifb = "0.9"
+glium = "0.15"
