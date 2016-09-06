@@ -53,6 +53,11 @@ impl Orbit {
         self.cam.look_in(eye_to_origin);
     }
 
+    fn update_distance(&mut self, distance: f64) {
+        self.distance = distance;
+        self.cam.position = self.origin + self.distance * -self.cam.direction;
+    }
+
     pub fn camera(&self) -> &Camera {
         // debug!("{:?}", self.cam.spherical_coords());
         // debug!("{:?} || {:?}", self.cam.position, self.cam.direction);
@@ -75,6 +80,14 @@ impl Orbit {
             }
             Event::KeyboardInput(_, _, Some(VirtualKeyCode::Down)) => {
                 self.turn_camera_theta(Rad(-0.05));
+            }
+            Event::KeyboardInput(_, _, Some(VirtualKeyCode::Add)) => {
+                let new_dist = self.distance * 0.95;
+                self.update_distance(new_dist);
+            }
+            Event::KeyboardInput(_, _, Some(VirtualKeyCode::Subtract)) => {
+                let new_dist = self.distance / 0.95;
+                self.update_distance(new_dist);
             }
             _ => ()
         }

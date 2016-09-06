@@ -35,9 +35,10 @@ fn main() {
     println!("{:?}", display.get_supported_glsl_version());
     let mesh = FractalMesh::new(&display);
 
+    let (w, h) = display.get_framebuffer_dimensions();
     let proj = Projection {
         fov: Rad(1.0),
-        aspect_ratio: 1.0,
+        aspect_ratio: (w as f64) / (h as f64),
         near_plane: 0.01,
         far_plane: 100.0,
     };
