@@ -13,6 +13,7 @@ mod app;
 mod camera;
 mod control;
 mod errors;
+mod event;
 mod mesh;
 mod to_arr;
 
