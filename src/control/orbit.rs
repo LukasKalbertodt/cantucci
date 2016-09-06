@@ -5,14 +5,14 @@ use std::f64::consts::PI;
 
 
 pub struct Orbit {
-    origin: Point3f,
+    origin: Point3<f64>,
     distance: f64,
     cam: Camera,
     // last_mouse_pos
 }
 
 impl Orbit {
-    pub fn around(origin: Point3f, proj: Projection) -> Self {
+    pub fn around(origin: Point3<f64>, proj: Projection) -> Self {
         let init_dir = Vector3::new(1.0, 0.0, 0.0).normalize();
         let distance = 5.0;
         Orbit {

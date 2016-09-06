@@ -1,15 +1,16 @@
 use std::ops::Range;
 use core::math::*;
+use cgmath;
 use std::error::Error as StdError;
 
 pub struct Camera {
-    pub position: Point3f,
-    pub direction: Vector3f,
+    pub position: Point3<f64>,
+    pub direction: Vector3<f64>,
     projection: Projection,
 }
 
 impl Camera {
-    pub fn new(pos: Point3f, dir: Vector3f, proj: Projection)
+    pub fn new(pos: Point3<f64>, dir: Vector3<f64>, proj: Projection)
         -> Result<Self, Box<StdError>>
     {
 
@@ -27,19 +28,19 @@ impl Camera {
         (Rad(d.z.acos()), Rad(f64::atan2(d.y, d.x)))
     }
 
-    pub fn look_in(&mut self, dir: Vector3f) {
+    pub fn look_in(&mut self, dir: Vector3<f64>) {
         self.direction = dir.normalize();
     }
 
-    pub fn view_transform(&self) -> Matrix4f {
+    pub fn view_transform(&self) -> Matrix4<f64> {
         Matrix4::look_at(
             self.position,
             self.position + self.direction,
-            Vector3f::new(0.0, 0.0, 1.0),
+            Vector3::new(0.0, 0.0, 1.0),
         )
     }
 
-    pub fn proj_transform(&self) -> Matrix4f {
+    pub fn proj_transform(&self) -> Matrix4<f64> {
         self.projection.transformation_matrix()
     }
 }
@@ -78,6 +79,8 @@ impl Projection {
         }
     }
 
+    /// Calculates and sets the aspect ratio from the screen dimension. The
+    /// dimension has to be non-zero in both directions.
     pub fn set_aspect_ratio(&mut self, width: u32, height: u32) {
         assert!(
             width > 0 && height > 0,
@@ -94,7 +97,7 @@ impl Projection {
     /// The field of view needs to be in between 0 and π/2. Both, near and far
     /// plane have to be greater than zero and the near plane has to be less
     /// than the far plane.
-    pub fn transformation_matrix(&self) -> Matrix4f {
+    pub fn transformation_matrix(&self) -> Matrix4<f64> {
         use std::f64::consts::FRAC_PI_2;
 
         assert!(self.fov > Rad(0.0));
@@ -103,7 +106,7 @@ impl Projection {
         assert!(self.near_plane > 0.0);
         assert!(self.far_plane > self.near_plane);
 
-        perspective(
+        cgmath::perspective(
             self.fov,
             self.aspect_ratio,
             self.near_plane,
@@ -111,22 +114,3 @@ impl Projection {
         )
     }
 }
-
-// pub struct CameraParams {
-//     pub position: Point3f,
-//     pub direction: Vector3f,
-//     pub fov: Rad<f64>,
-//     pub aspect_ratio: f64,
-//     pub near_plane: f64,
-//     pub far_plane: f64,
-// }
-
-// quick_error! {
-//     #[derive(Debug)]
-//     pub enum ParamError {
-//         InvalidFov(fov: Rad<f64>) {
-//             description("fov has to be less than 180° = π/2 and greater than 0")
-//             display("given fov ({}) is greater than 180° = π/2 or less than 0", fov.0)
-//         }
-//     }
-// }

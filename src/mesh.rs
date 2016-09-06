@@ -12,7 +12,7 @@ pub struct FractalMesh {
 
 impl FractalMesh {
     pub fn new<F: Facade>(facade: &F) -> Self {
-        fn is_in_set(mut p: Point3f) -> bool {
+        fn is_in_set(mut p: Point3<f64>) -> bool {
             ::std::mem::swap(&mut p.y, &mut p.z);
             let mut z = p;
             let mut r = 0.0;
@@ -38,7 +38,7 @@ impl FractalMesh {
                 let phi = phi * POWER;
 
                 // convert back to cartesian coordinates
-                z = zr * Point3f::new(
+                z = zr * Point3::new(
                     theta.sin() * phi.cos(),
                     phi.sin() * theta.sin(),
                     theta.cos()
