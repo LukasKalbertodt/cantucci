@@ -2,7 +2,7 @@ extern crate cgmath;
 extern crate rayon;
 
 mod types;
-mod math;
+pub mod math;
 pub use types::{PixelImage, Color};
 use math::*;
 use std::time::Instant;

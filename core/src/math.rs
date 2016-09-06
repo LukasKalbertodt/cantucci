@@ -23,3 +23,7 @@ pub type Point2f = Point2<DefaultFloat>;
 pub type Point3f = Point3<DefaultFloat>;
 // pub type Point3i = Point3<DefaultInt>;
 // pub type Point3u = Point3<DefaultUnsigned>;
+
+pub type Matrix2f = Matrix2<DefaultFloat>;
+pub type Matrix3f = Matrix3<DefaultFloat>;
+pub type Matrix4f = Matrix4<DefaultFloat>;
