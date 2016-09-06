@@ -115,6 +115,10 @@ impl Orbit {
     pub fn camera(&self) -> &Camera {
         &self.cam
     }
+
+    pub fn projection_mut(&mut self) -> &mut Projection {
+        &mut self.cam.projection
+    }
 }
 
 impl EventHandler for Orbit {

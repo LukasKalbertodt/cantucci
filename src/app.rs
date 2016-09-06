@@ -53,22 +53,40 @@ impl App {
 
             target.finish().unwrap();
 
-            // use glium::glutin::Event;
-            // use event::EventHandler;
-            // let x: &EventHandler =
-            //     &|e| { println!("hi"); EventResponse::NotHandled };
 
-            let res = poll_events_with(&self.facade, vec![
-                &mut self.control,
-                &mut QuitHandler,
-                // &mut ,
-            ]);
-
+            // Poll window events
+            let res = self.poll_events();
             if res == EventResponse::Quit {
                 info!("Bye! :)");
                 return Ok(());
             }
         }
+    }
+
+    fn poll_events(&mut self) -> EventResponse {
+        use glium::glutin::Event;
+
+        let mut new_res = None;
+
+        let out = poll_events_with(&self.facade, vec![
+            &mut self.control,
+            &mut QuitHandler,
+            &mut |e: &Event| {
+                if let Event::Resized(w, h) = *e {
+                    new_res = Some((w, h));
+                    EventResponse::Continue
+                } else {
+                    EventResponse::NotHandled
+                }
+            },
+        ]);
+
+        if let Some((w, h)) = new_res {
+            self.control.projection_mut().set_aspect_ratio(w, h);
+            trace!("resolution changed to {}x{}px", w, h);
+        }
+
+        out
     }
 }
 

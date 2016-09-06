@@ -7,7 +7,7 @@ use cgmath;
 pub struct Camera {
     pub position: Point3<f64>,
     direction: Vector3<f64>,
-    projection: Projection,
+    pub projection: Projection,
 }
 
 impl Camera {
