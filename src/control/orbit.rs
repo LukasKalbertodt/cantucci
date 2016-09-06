@@ -68,7 +68,7 @@ impl Orbit {
 
 impl EventHandler for Orbit {
     fn handle_event(&mut self, e: &Event) -> EventResponse {
-        use glium::glutin::ElementState;
+        // use glium::glutin::ElementState;
         use glium::glutin::VirtualKeyCode;
 
         match *e {
