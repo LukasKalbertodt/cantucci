@@ -1,5 +1,3 @@
-use camera;
-use std::error::Error as StdError;
 use glium;
 
 error_chain! {
