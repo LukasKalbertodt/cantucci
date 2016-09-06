@@ -4,7 +4,7 @@ mod buffer;
 use glium::{self, DepthTest, Program, Surface, DrawParameters};
 use glium::backend::Facade;
 use camera::Camera;
-use to_arr::ToArr;
+use util::ToArr;
 use core::math::*;
 use self::octree::Octree;
 use self::buffer::MeshBuffer;

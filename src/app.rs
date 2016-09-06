@@ -44,6 +44,8 @@ impl App {
         use glium::Surface;
 
         loop {
+            self.control.update(0.02);
+
             let mut target = self.facade.draw();
             target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 

@@ -18,8 +18,7 @@ impl MeshBuffer {
         assert!(cube.start.z < cube.end.z);
 
 
-        fn is_in_set(mut p: Point3<f64>) -> bool {
-            ::std::mem::swap(&mut p.y, &mut p.z);
+        fn is_in_set(p: Point3<f64>) -> bool {
             let mut z = p;
 
             const MAX_ITERS: u32 = 10;
