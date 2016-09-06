@@ -20,59 +20,68 @@ mod to_arr;
 use glium::glutin::{self, Event, VirtualKeyCode, GlRequest};
 use glium::backend::glutin_backend::GlutinFacade;
 use mesh::FractalMesh;
-use camera::{Camera, Projection};
+use camera::Projection;
 use core::math::*;
 use control::Orbit as OrbitControl;
 
+const WINDOW_TITLE: &'static str = "Cantucci <3";
 
 fn main() {
     env_logger::init().unwrap();
 
-    use glium::{DisplayBuild, Surface};
-    let display = create_context().unwrap();
-
-    println!("{:?}", display.get_opengl_version());
-    println!("{:?}", display.get_supported_glsl_version());
-    let mesh = FractalMesh::new(&display);
-
-    let (w, h) = display.get_framebuffer_dimensions();
-    let proj = Projection {
-        fov: Rad(1.0),
-        aspect_ratio: (w as f64) / (h as f64),
-        near_plane: 0.01,
-        far_plane: 100.0,
-    };
-
-    let mut orbit = OrbitControl::around(Point3::new(0.0, 0.0, 0.0), proj);
-
-    loop {
-        let mut target = display.draw();
-        target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
-
-        mesh.draw(&mut target, orbit.camera());
-
-        target.finish().unwrap();
-
-        for ev in display.poll_events() {
-            orbit.handle_event(&ev);
-            match ev {
-                Event::Closed => return,
-                Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => return,
-                _ => ()
-            }
-        }
-    }
+    let mut app = App::init();
+    app.run();
 }
 
 struct App {
     facade: GlutinFacade,
+    control: OrbitControl,
+    mesh: FractalMesh,
 }
 
 impl App {
-    pub fn new() {
+    pub fn init() -> Self {
+        // TODO: proper error handling
+        let facade = create_context().unwrap();
 
+        let mesh = FractalMesh::new(&facade);
+
+        let proj = Projection::new(
+            Rad(1.0),
+            0.01 .. 100.0,
+            facade.get_framebuffer_dimensions(),
+        );
+
+        let orbit = OrbitControl::around(Point3::new(0.0, 0.0, 0.0), proj);
+
+        App {
+            facade: facade,
+            control: orbit,
+            mesh: mesh,
+        }
     }
 
+    pub fn run(&mut self) {
+        use glium::Surface;
+
+        loop {
+            let mut target = self.facade.draw();
+            target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
+
+            self.mesh.draw(&mut target, self.control.camera());
+
+            target.finish().unwrap();
+
+            for ev in self.facade.poll_events() {
+                self.control.handle_event(&ev);
+                match ev {
+                    Event::Closed => return,
+                    Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => return,
+                    _ => ()
+                }
+            }
+        }
+    }
 
 }
 
@@ -97,7 +106,8 @@ fn create_context() -> Result<GlutinFacade, ()> {
     // Create glium context
     let context = glutin::WindowBuilder::new()
         .with_dimensions(monitor_width / 2, monitor_height / 2)
-        .with_title("Cantucci <3")
+        .with_title(WINDOW_TITLE)
+        .with_gl(GlRequest::Latest)
         .build_glium();
 
     match context {
@@ -112,18 +122,22 @@ fn create_context() -> Result<GlutinFacade, ()> {
             info!("OpenGL context was successfully built");
 
             let glium::Version(api, major, minor) = *context.get_opengl_version();
-            info!("Version of context: {} {}.{}",
-                  if api == glium::Api::Gl { "OpenGL" } else { "OpenGL ES" },
-                  major,
-                  minor);
+            info!(
+                "Version of context: {} {}.{}",
+                if api == glium::Api::Gl { "OpenGL" } else { "OpenGL ES" },
+                major,
+                minor
+            );
 
             let glium::Version(api, major, minor) = context.get_supported_glsl_version();
-            info!("Supported GLSL version: {} {}.{}",
-                  if api == glium::Api::Gl { "GLSL" } else { "GLSL ES" },
-                  major,
-                  minor);
+            info!(
+                "Supported GLSL version: {} {}.{}",
+                if api == glium::Api::Gl { "GLSL" } else { "GLSL ES" },
+                major,
+                minor
+            );
 
-            if let Some(mem) = context.get_free_video_memory() {
+            if let Some(mem) = context.get_free_video_memory().map(|mem| mem as u64) {
                 let (mem, unit) = match () {
                     _ if mem < (1 << 12) => (mem, "B"),
                     _ if mem < (1 << 22) => (mem >> 10, "KB"),
