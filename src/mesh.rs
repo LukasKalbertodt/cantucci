@@ -50,7 +50,7 @@ impl FractalMesh {
         }
 
         let mut raw_vbuf = Vec::new();
-        const RES: i32 = 100;
+        const RES: i32 = 50;
         for x in -RES..RES {
             for y in -RES..RES {
                 for z in -RES..RES {

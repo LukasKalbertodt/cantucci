@@ -9,6 +9,7 @@ extern crate error_chain;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate term_painter;
 
 
 mod mesh;
@@ -22,15 +23,34 @@ use glium::backend::glutin_backend::GlutinFacade;
 use mesh::FractalMesh;
 use camera::Projection;
 use core::math::*;
+use errors::*;
 use control::Orbit as OrbitControl;
 
-const WINDOW_TITLE: &'static str = "Cantucci <3";
+const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
 fn main() {
-    env_logger::init().unwrap();
+    use std::cmp::min;
+    use term_painter::ToStyle;
+    use term_painter::Color::*;
 
-    let mut app = App::init();
-    app.run();
+    // Init logger implementation
+    env_logger::init().expect("failed to initialize logger");
+
+    // Create whole app and run it, if it succeeds
+    let res = App::init().and_then(|mut app| app.run());
+
+    // Pretty print error chain
+    if let Err(error_chain) = res {
+        println!("Something went wrong ☹ ! Here is the backtrace:");
+        for (i, e) in error_chain.iter().enumerate() {
+            println!(
+                "{: >2$} {}",
+                Yellow.paint(if i == 0 { "→" } else { "⤷" }),
+                Red.paint(e),
+                2 * min(i, 7) + 1,
+            );
+        }
+    };
 }
 
 struct App {
@@ -40,9 +60,12 @@ struct App {
 }
 
 impl App {
-    pub fn init() -> Self {
-        // TODO: proper error handling
-        let facade = create_context().unwrap();
+    /// Creates all needed resources, including the OpenGL context.
+    pub fn init() -> Result<Self> {
+        // Create OpenGL context
+        let facade = try!(
+            create_context().chain_err(|| "failed to create GL context")
+        );
 
         let mesh = FractalMesh::new(&facade);
 
@@ -54,14 +77,15 @@ impl App {
 
         let orbit = OrbitControl::around(Point3::new(0.0, 0.0, 0.0), proj);
 
-        App {
+        Ok(App {
             facade: facade,
             control: orbit,
             mesh: mesh,
-        }
+        })
     }
 
-    pub fn run(&mut self) {
+    /// Contains the main loop used to show stuff on the screen.
+    pub fn run(&mut self) -> Result<()> {
         use glium::Surface;
 
         loop {
@@ -75,8 +99,8 @@ impl App {
             for ev in self.facade.poll_events() {
                 self.control.handle_event(&ev);
                 match ev {
-                    Event::Closed => return,
-                    Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => return,
+                    Event::Closed => return Ok(()),
+                    Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => return Ok(()),
                     _ => ()
                 }
             }
@@ -89,7 +113,7 @@ impl App {
 
 /// Creates the OpenGL context and logs useful information about the
 /// success or failure of said action.
-fn create_context() -> Result<GlutinFacade, ()> {
+fn create_context() -> Result<GlutinFacade> {
     use glium::glutin::get_primary_monitor;
     use glium::DisplayBuild;
 
@@ -110,44 +134,36 @@ fn create_context() -> Result<GlutinFacade, ()> {
         .with_gl(GlRequest::Latest)
         .build_glium();
 
-    match context {
-        Err(e) => {
-            error!("OpenGL context creation failed! Detailed error:");
-            error!("{}", e);
+    let context = try!(context);
 
-            Err(())
-        }
-        Ok(context) => {
-            // Print some information about the acquired OpenGL context
-            info!("OpenGL context was successfully built");
+    // Print some information about the acquired OpenGL context
+    info!("OpenGL context was successfully built");
 
-            let glium::Version(api, major, minor) = *context.get_opengl_version();
-            info!(
-                "Version of context: {} {}.{}",
-                if api == glium::Api::Gl { "OpenGL" } else { "OpenGL ES" },
-                major,
-                minor
-            );
+    let glium::Version(api, major, minor) = *context.get_opengl_version();
+    info!(
+        "Version of context: {} {}.{}",
+        if api == glium::Api::Gl { "OpenGL" } else { "OpenGL ES" },
+        major,
+        minor
+    );
 
-            let glium::Version(api, major, minor) = context.get_supported_glsl_version();
-            info!(
-                "Supported GLSL version: {} {}.{}",
-                if api == glium::Api::Gl { "GLSL" } else { "GLSL ES" },
-                major,
-                minor
-            );
+    let glium::Version(api, major, minor) = context.get_supported_glsl_version();
+    info!(
+        "Supported GLSL version: {} {}.{}",
+        if api == glium::Api::Gl { "GLSL" } else { "GLSL ES" },
+        major,
+        minor
+    );
 
-            if let Some(mem) = context.get_free_video_memory().map(|mem| mem as u64) {
-                let (mem, unit) = match () {
-                    _ if mem < (1 << 12) => (mem, "B"),
-                    _ if mem < (1 << 22) => (mem >> 10, "KB"),
-                    _ if mem < (1 << 32) => (mem >> 20, "MB"),
-                    _ => (mem >> 30, "GB"),
-                };
-                info!("Free GPU memory (estimated): {}{}", mem, unit);
-            }
-
-            Ok(context)
-        }
+    if let Some(mem) = context.get_free_video_memory().map(|mem| mem as u64) {
+        let (mem, unit) = match () {
+            _ if mem < (1 << 12) => (mem, "B"),
+            _ if mem < (1 << 22) => (mem >> 10, "KB"),
+            _ if mem < (1 << 32) => (mem >> 20, "MB"),
+            _ => (mem >> 30, "GB"),
+        };
+        info!("Free GPU memory (estimated): {}{}", mem, unit);
     }
+
+    Ok(context)
 }
