@@ -18,7 +18,7 @@ impl Orbit {
         Orbit {
             origin: origin,
             distance: distance,
-            cam: Camera::new(origin + -(init_dir * distance), init_dir, proj).unwrap(),
+            cam: Camera::new(origin + -(init_dir * distance), init_dir, proj),
         }
     }
 
@@ -55,7 +55,7 @@ impl Orbit {
 
     fn update_distance(&mut self, distance: f64) {
         self.distance = distance;
-        self.cam.position = self.origin + self.distance * -self.cam.direction;
+        self.cam.position = self.origin + self.distance * -self.cam.direction();
     }
 
     pub fn camera(&self) -> &Camera {

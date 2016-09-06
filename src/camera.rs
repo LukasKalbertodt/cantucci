@@ -1,24 +1,27 @@
 use std::ops::Range;
 use core::math::*;
 use cgmath;
-use std::error::Error as StdError;
 
+/// Saves the camera position and look direction as well as projection
+/// parameters.
 pub struct Camera {
     pub position: Point3<f64>,
-    pub direction: Vector3<f64>,
+    direction: Vector3<f64>,
     projection: Projection,
 }
 
 impl Camera {
-    pub fn new(pos: Point3<f64>, dir: Vector3<f64>, proj: Projection)
-        -> Result<Self, Box<StdError>>
-    {
+    /// Creates a new instance.
+    ///
+    /// `dir` mustn't be zero.
+    pub fn new(pos: Point3<f64>, dir: Vector3<f64>, proj: Projection) -> Self {
+        assert!(!dir.is_zero());
 
-        Ok(Camera {
+        Camera {
             position: pos,
             direction: dir.normalize(),
             projection: proj,
-        })
+        }
     }
 
     /// Returns the spherical coordinates of the direction vector as
@@ -28,10 +31,17 @@ impl Camera {
         (Rad(d.z.acos()), Rad(f64::atan2(d.y, d.x)))
     }
 
+    /// Sets the normalized, given vector as new direction vector.
     pub fn look_in(&mut self, dir: Vector3<f64>) {
         self.direction = dir.normalize();
     }
 
+    /// Returns the current direction vector. It's guaranteed to be normalized.
+    pub fn direction(&self) -> Vector3<f64> {
+        self.direction
+    }
+
+    /// Returns the matrix representing the transformation into view space.
     pub fn view_transform(&self) -> Matrix4<f64> {
         Matrix4::look_at(
             self.position,
@@ -40,6 +50,8 @@ impl Camera {
         )
     }
 
+    /// Returns the matrix representing the transformation into projection
+    /// space.
     pub fn proj_transform(&self) -> Matrix4<f64> {
         self.projection.transformation_matrix()
     }
