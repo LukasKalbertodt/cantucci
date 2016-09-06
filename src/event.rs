@@ -1,5 +1,5 @@
 use glium::backend::glutin_backend::GlutinFacade;
-use glium::glutin::{Event, VirtualKeyCode};
+use glium::glutin::Event;
 
 
 /// Every event receiver has to return a response for each event received.
@@ -21,17 +21,21 @@ pub trait EventHandler {
     fn handle_event(&mut self, e: &Event) -> EventResponse;
 }
 
-impl<F> EventHandler for F where F: FnMut(&Event) -> EventResponse {
+impl<F> EventHandler for F where
+    F: FnMut(&Event) -> EventResponse
+{
     fn handle_event(&mut self, e: &Event) -> EventResponse {
         self(e)
     }
 }
 
 /// Handler that handles events intended to quit the program.
-pub struct CloseHandler;
+pub struct QuitHandler;
 
-impl EventHandler for CloseHandler {
+impl EventHandler for QuitHandler {
     fn handle_event(&mut self, e: &Event) -> EventResponse {
+        use glium::glutin::VirtualKeyCode;
+
         match *e {
             Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) |
                 Event::Closed => EventResponse::Quit,
@@ -40,7 +44,7 @@ impl EventHandler for CloseHandler {
     }
 }
 
-pub fn poll_events_with(facade: GlutinFacade, mut handlers: Vec<&mut EventHandler>)
+pub fn poll_events_with(facade: &GlutinFacade, mut handlers: Vec<&mut EventHandler>)
     -> EventResponse
 {
     let mut handled_one  = false;

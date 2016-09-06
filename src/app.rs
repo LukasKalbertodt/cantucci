@@ -2,8 +2,8 @@ use camera::Projection;
 use control::Orbit as OrbitControl;
 use core::math::*;
 use errors::*;
+use event::{EventResponse, poll_events_with, QuitHandler};
 use glium::backend::glutin_backend::GlutinFacade;
-use glium::glutin::{self, Event, VirtualKeyCode};
 use mesh::FractalMesh;
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
@@ -51,24 +51,30 @@ impl App {
 
             target.finish().unwrap();
 
-            for ev in self.facade.poll_events() {
-                self.control.handle_event(&ev);
-                match ev {
-                    Event::Closed => return Ok(()),
-                    Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => return Ok(()),
-                    _ => ()
-                }
+            // use glium::glutin::Event;
+            // use event::EventHandler;
+            // let x: &EventHandler =
+            //     &|e| { println!("hi"); EventResponse::NotHandled };
+
+            let res = poll_events_with(&self.facade, vec![
+                &mut self.control,
+                &mut QuitHandler,
+                // &mut ,
+            ]);
+
+            if res == EventResponse::Quit {
+                info!("Bye! :)");
+                return Ok(());
             }
         }
     }
-
 }
 
 
 /// Creates the OpenGL context and logs useful information about the
 /// success or failure of said action.
 fn create_context() -> Result<GlutinFacade> {
-    use glium::glutin::{get_primary_monitor, GlRequest};
+    use glium::glutin::{self, get_primary_monitor, GlRequest};
     use glium::{self, DisplayBuild};
 
     // Check resolution of monitor

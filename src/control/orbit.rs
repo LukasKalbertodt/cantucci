@@ -1,7 +1,8 @@
 use camera::{Camera, Projection};
-use glium::glutin::{Event, VirtualKeyCode};
+use glium::glutin::Event;
 use core::math::*;
 use std::f64::consts::PI;
+use event::{EventHandler, EventResponse};
 
 
 pub struct Orbit {
@@ -63,12 +64,14 @@ impl Orbit {
         // debug!("{:?} || {:?}", self.cam.position, self.cam.direction);
         &self.cam
     }
+}
 
-    pub fn handle_event(&mut self, event: &Event) {
-        // debug!("------------");
+impl EventHandler for Orbit {
+    fn handle_event(&mut self, e: &Event) -> EventResponse {
         use glium::glutin::ElementState;
+        use glium::glutin::VirtualKeyCode;
 
-        match *event {
+        match *e {
             Event::KeyboardInput(_, _, Some(VirtualKeyCode::Left)) => {
                 self.turn_camera_phi(Rad(-0.1));
             }
@@ -89,7 +92,9 @@ impl Orbit {
                 let new_dist = self.distance / 0.95;
                 self.update_distance(new_dist);
             }
-            _ => ()
+            _ => return EventResponse::NotHandled,
         }
+
+        EventResponse::Break
     }
 }
