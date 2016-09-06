@@ -42,10 +42,20 @@ impl App {
     /// Contains the main loop used to show stuff on the screen.
     pub fn run(&mut self) -> Result<()> {
         use glium::Surface;
+        use std::time::Instant;
+
+        let mut last_time = Instant::now();
 
         loop {
-            self.control.update(0.02);
+            // Approximate time since last iteration and update all components
+            let delta = Instant::now() - last_time;
+            let delta_sec = (delta.subsec_nanos() / 1000) as f64 / 1_000_000.0;
 
+            self.control.update(delta_sec);
+
+            last_time = Instant::now();
+
+            // Clear and start drawing on the default framebuffer
             let mut target = self.facade.draw();
             target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
