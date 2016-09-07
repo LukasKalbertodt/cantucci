@@ -1,5 +1,7 @@
 use camera::Projection;
 use control::Orbit as OrbitControl;
+use control::Fly as FlyControl;
+use control::{CamControl, KeySwitcher};
 use core::math::*;
 use core::shape::Mandelbulb;
 use errors::*;
@@ -11,13 +13,15 @@ const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
 pub struct App {
     facade: GlutinFacade,
-    control: OrbitControl,
+    control: Box<CamControl>,
     mesh: FractalMesh<Mandelbulb>,
 }
 
 impl App {
     /// Creates all needed resources, including the OpenGL context.
     pub fn init() -> Result<Self> {
+        use glium::glutin::VirtualKeyCode;
+
         // Create OpenGL context
         let facade = try!(
             create_context().chain_err(|| "failed to create GL context")
@@ -33,10 +37,12 @@ impl App {
         );
 
         let orbit = OrbitControl::around(Point3::new(0.0, 0.0, 0.0), proj);
+        let fly = FlyControl::new(orbit.camera().clone());
+        let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
 
         Ok(App {
             facade: facade,
-            control: orbit,
+            control: Box::new(switcher),
             mesh: mesh,
         })
     }
@@ -61,7 +67,7 @@ impl App {
             let mut target = self.facade.draw();
             target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
-            self.mesh.draw(&mut target, self.control.camera());
+            self.mesh.draw(&mut target, &self.control.camera());
 
             target.finish().unwrap();
 
@@ -81,7 +87,7 @@ impl App {
         let mut new_res = None;
 
         let out = poll_events_with(&self.facade, vec![
-            &mut self.control,
+            self.control.as_event_handler(),
             &mut QuitHandler,
             &mut |e: &Event| {
                 if let Event::Resized(w, h) = *e {

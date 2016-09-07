@@ -1,8 +1,9 @@
 use camera::{Camera, Projection};
-use glium::glutin::Event;
 use core::math::*;
-use std::f64::consts::PI;
 use event::{EventHandler, EventResponse};
+use glium::glutin::Event;
+use std::f64::consts::PI;
+use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which theta can change.
 /// Phi can change twice as fast, because the range is twice as big.
@@ -58,9 +59,40 @@ impl Orbit {
         }
     }
 
-    /// Needs to be called regularly to update the camera. `delta` needs to be
-    /// the time in seconds since the last time this method was called.
-    pub fn update(&mut self, delta: f64) {
+    fn update_camera_from_theta_phi(&mut self, mut theta: Rad<f64>, phi: Rad<f64>) {
+        if theta < Rad(0.05) {
+            theta = Rad(0.05);
+        }
+        if theta > Rad(PI - 0.05) {
+            theta = Rad(PI - 0.05);
+        }
+
+        let eye_to_origin = Vector3::new(
+            theta.sin() * phi.cos(),
+            theta.sin() * phi.sin(),
+            theta.cos(),
+        );
+
+        self.cam.position = self.origin + self.distance * -eye_to_origin;
+        self.cam.look_in(eye_to_origin);
+    }
+
+    fn update_distance(&mut self, distance: f64) {
+        self.distance = distance;
+        self.cam.position = self.origin + self.distance * -self.cam.direction();
+    }
+}
+
+impl CamControl for Orbit {
+    fn camera(&self) -> Camera {
+        self.cam
+    }
+
+    fn projection_mut(&mut self) -> &mut Projection {
+        &mut self.cam.projection
+    }
+
+    fn update(&mut self, delta: f64) {
         use util::lerp;
 
         // Update the theta and phi turning speeds
@@ -88,36 +120,15 @@ impl Orbit {
         self.update_distance(new_distance);
     }
 
-    fn update_camera_from_theta_phi(&mut self, mut theta: Rad<f64>, phi: Rad<f64>) {
-        if theta < Rad(0.05) {
-            theta = Rad(0.05);
-        }
-        if theta > Rad(PI - 0.05) {
-            theta = Rad(PI - 0.05);
-        }
-
-        let eye_to_origin = Vector3::new(
-            theta.sin() * phi.cos(),
-            theta.sin() * phi.sin(),
-            theta.cos(),
-        );
-
-        self.cam.position = self.origin + self.distance * -eye_to_origin;
-        self.cam.look_in(eye_to_origin);
+    fn as_event_handler(&mut self) -> &mut EventHandler {
+        self
     }
 
-    fn update_distance(&mut self, distance: f64) {
-        self.distance = distance;
-        self.cam.position = self.origin + self.distance * -self.cam.direction();
-    }
-
-    /// Returns the internal camera
-    pub fn camera(&self) -> &Camera {
-        &self.cam
-    }
-
-    pub fn projection_mut(&mut self) -> &mut Projection {
-        &mut self.cam.projection
+    fn match_view(&mut self, other: &Camera) {
+        let view_dir = self.origin - other.position;
+        self.cam.look_in(view_dir);
+        self.distance = view_dir.magnitude();
+        self.cam.position = other.position;
     }
 }
 

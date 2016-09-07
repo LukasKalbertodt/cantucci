@@ -4,6 +4,7 @@ use cgmath;
 
 /// Saves the camera position and look direction as well as projection
 /// parameters.
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Camera {
     pub position: Point3<f64>,
     direction: Vector3<f64>,
@@ -59,6 +60,7 @@ impl Camera {
 
 /// Represents a specific projection that can be transformed by the selected
 /// rendering method.
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Projection {
     /// Field of view in the y direction (in range [0, π/2]).
     pub fov: Rad<f64>,
