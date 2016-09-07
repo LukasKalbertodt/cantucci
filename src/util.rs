@@ -54,51 +54,6 @@ impl Lerp<f64> for Point3<f64> {
 }
 
 
-// impl<V, F> Lerp<F> for V
-//     where F: LerpFactor,
-//           V: Mul<F>,
-//           V::Output: Add<Output=V>
-// {
-//     fn lerp(self, other: Self, t: F) -> Self {
-//         self * (F::one() - t) + other * t
-//     }
-// }
-
-// impl<T, F> Lerp<F> for Point3<T>
-//     where F: LerpFactor,
-//           Point3<T>: Mul<F>,
-//           <Point3<T> as Mul<F>>::Output: Add<Output=Point3<T>>
-// {
-//     fn lerp(self, other: Self, t: F) -> Self {
-//         self * (F::one() - t) + other * t
-//     }
-// }
-
-// impl<F> Lerp<F> for Point3<f64>
-//     where F: LerpFactor,
-//           Point3<f64>: Mul<F>,
-//           <Vector3<f64> as Mul<F>>::Output: Add<Output=Vector3<f64>>
-// {
-//     fn lerp(self, other: Self, t: F) -> Self {
-//         self * (F::one() - t) + other * t
-//     }
-// }
-
-// impl<V, F> Lerp<F> for V
-//     where V: VectorSpace<Scalar = F>,
-//           F: LerpFactor + BaseNum
-// {
-//     fn lerp(self, other: Self, t: F) -> Self {
-//         self * (F::one() - t) + other * t
-//     }
-// }
-
-// impl<T: BaseNum, F: LerpFactor> Lerp<F> for T {
-//     fn lerp(self, other: Self, t: F) -> Self {
-//         self * (F::one() - t) + other * t
-//     }
-// }
-
 pub fn clamp<T: PartialOrd>(val: T, min: T, max: T) -> T {
     assert!(min < max);
 
