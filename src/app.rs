@@ -15,6 +15,7 @@ pub struct App {
     facade: GlutinFacade,
     control: Box<CamControl>,
     mesh: FractalMesh<Mandelbulb>,
+    print_fps: bool,
 }
 
 impl App {
@@ -44,17 +45,25 @@ impl App {
             facade: facade,
             control: Box::new(switcher),
             mesh: mesh,
+            print_fps: false,
         })
     }
 
     /// Contains the main loop used to show stuff on the screen.
     pub fn run(&mut self) -> Result<()> {
         use glium::Surface;
-        use std::time::Instant;
+        use std::time::{Duration, Instant};
+        use std::io::{self, Write};
 
+        const PRINT_FPS_EVERY_MS: u64 = 200;
+        let mut next_fps_print_in = Duration::from_millis(PRINT_FPS_EVERY_MS);
+        let mut frame_count = 0;
         let mut last_time = Instant::now();
 
         loop {
+            // FPS calculations
+            let before_frame = Instant::now();
+
             // Approximate time since last iteration and update all components
             let delta = Instant::now() - last_time;
             let delta_sec = (delta.subsec_nanos() / 1000) as f64 / 1_000_000.0;
@@ -78,13 +87,39 @@ impl App {
                 info!("Bye! :)");
                 return Ok(());
             }
+
+            // Print FPS
+            if self.print_fps {
+                frame_count += 1;
+                let delta = Instant::now() - before_frame;
+
+                if delta >= next_fps_print_in {
+                    let over_time = delta - next_fps_print_in;
+                    let since_last = over_time + Duration::from_millis(PRINT_FPS_EVERY_MS);
+                    let since_last = (since_last.subsec_nanos() / 1000) as f64 / 1000.0;
+
+                    let avg_delta = since_last / (frame_count as f64);
+
+                    print!("\rδ {:.3}ms ({:.3} FPS)", avg_delta, 1000.0 / avg_delta);
+                    io::stdout().flush().expect("flushing stdout failed...");
+
+                    // Reset values
+                    frame_count = 0;
+                    next_fps_print_in = Duration::from_millis(PRINT_FPS_EVERY_MS);
+                } else {
+                    next_fps_print_in -= delta;
+                }
+            }
         }
     }
 
     fn poll_events(&mut self) -> EventResponse {
         use glium::glutin::Event;
+        use glium::glutin::ElementState::*;
+        use glium::glutin::VirtualKeyCode as Vkc;
 
         let mut new_res = None;
+        let print_fps = &mut self.print_fps;
 
         let out = poll_events_with(&self.facade, vec![
             self.control.as_event_handler(),
@@ -93,6 +128,14 @@ impl App {
                 if let Event::Resized(w, h) = *e {
                     new_res = Some((w, h));
                     EventResponse::Continue
+                } else {
+                    EventResponse::NotHandled
+                }
+            },
+            &mut |e: &Event| {
+                if let Event::KeyboardInput(Pressed, _, Some(Vkc::V)) = *e {
+                    *print_fps = !*print_fps;
+                    EventResponse::Break
                 } else {
                     EventResponse::NotHandled
                 }
