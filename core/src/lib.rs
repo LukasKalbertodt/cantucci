@@ -2,8 +2,11 @@ extern crate cgmath;
 extern crate rayon;
 
 mod types;
+pub mod shape;
 pub mod math;
+
 pub use types::{PixelImage, Color};
+pub use shape::Shape;
 // use math::*;
 // use std::time::Instant;
 

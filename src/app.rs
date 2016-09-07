@@ -1,6 +1,7 @@
 use camera::Projection;
 use control::Orbit as OrbitControl;
 use core::math::*;
+use core::shape::Mandelbulb;
 use errors::*;
 use event::{EventResponse, poll_events_with, QuitHandler};
 use glium::backend::glutin_backend::GlutinFacade;
@@ -11,7 +12,7 @@ const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 pub struct App {
     facade: GlutinFacade,
     control: OrbitControl,
-    mesh: FractalMesh,
+    mesh: FractalMesh<Mandelbulb>,
 }
 
 impl App {
@@ -22,11 +23,12 @@ impl App {
             create_context().chain_err(|| "failed to create GL context")
         );
 
-        let mesh = FractalMesh::new(&facade);
+        let mandelbulb = Mandelbulb::classic(20);
+        let mesh = FractalMesh::new(&facade, mandelbulb);
 
         let proj = Projection::new(
             Rad(1.0),
-            0.01 .. 100.0,
+            0.01 .. 20.0,
             facade.get_framebuffer_dimensions(),
         );
 

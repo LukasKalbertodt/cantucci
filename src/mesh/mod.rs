@@ -1,26 +1,30 @@
+use camera::Camera;
+use core::math::*;
+use core::Shape;
+use glium::backend::Facade;
+use glium::{self, DepthTest, Program, Surface, DrawParameters};
+use util::ToArr;
+
 mod octree;
 mod buffer;
 
-use glium::{self, DepthTest, Program, Surface, DrawParameters};
-use glium::backend::Facade;
-use camera::Camera;
-use util::ToArr;
-use core::math::*;
 use self::octree::Octree;
 use self::buffer::MeshBuffer;
 
 /// Type to manage the graphical representation of the fractal. It updates the
 /// internal data depending on the camera position and resolution.
-pub struct FractalMesh {
+pub struct FractalMesh<Sh> {
     buffer: Octree<MeshBuffer>,
     program: Program,
+    shape: Sh,
 }
 
-impl FractalMesh {
-    pub fn new<F: Facade>(facade: &F) -> Self {
+impl<Sh: Shape> FractalMesh<Sh> {
+    pub fn new<F: Facade>(facade: &F, shape: Sh) -> Self {
         let buf = MeshBuffer::generate_for_cube(
             facade,
             Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0),
+            &shape,
         );
         let tree = Octree::Leaf(buf);
 
@@ -69,6 +73,7 @@ impl FractalMesh {
         FractalMesh {
             buffer: tree,
             program: program,
+            shape: shape,
         }
     }
 

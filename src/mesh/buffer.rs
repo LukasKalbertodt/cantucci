@@ -1,8 +1,9 @@
+use core::math::*;
+use core::Shape;
 use glium::backend::Facade;
+use glium::index::PrimitiveType;
 use glium::{VertexBuffer, IndexBuffer};
 use std::ops::Range;
-use glium::index::PrimitiveType;
-use core::math::*;
 
 pub struct MeshBuffer {
     vbuf: VertexBuffer<Vertex>,
@@ -10,48 +11,13 @@ pub struct MeshBuffer {
 }
 
 impl MeshBuffer {
-    pub fn generate_for_cube<F: Facade>(facade: &F, cube: Range<Point3<f64>>)
-        -> Self
+    pub fn generate_for_cube<F, S>(facade: &F, cube: Range<Point3<f64>>, shape: &S) -> Self
+        where F: Facade,
+              S: Shape
     {
         assert!(cube.start.x < cube.end.x);
         assert!(cube.start.y < cube.end.y);
         assert!(cube.start.z < cube.end.z);
-
-
-        fn is_in_set(p: Point3<f64>) -> bool {
-            let mut z = p;
-
-            const MAX_ITERS: u32 = 10;
-            const BAILOUT: f64 = 2.5;
-            const POWER: f64 = 8.0;
-
-            for _ in 0..MAX_ITERS {
-
-                let r = z.to_vec().magnitude();
-                if r > BAILOUT {
-                    return false;
-                }
-
-                // convert to polar coordinates
-                let theta = (z.z / r).acos();
-                let phi = f64::atan2(z.y, z.x);
-
-                // scale and rotate the point
-                let zr = r.powf(POWER);
-                let theta = theta * POWER;
-                let phi = phi * POWER;
-
-                // convert back to cartesian coordinates
-                z = zr * Point3::new(
-                    theta.sin() * phi.cos(),
-                    phi.sin() * theta.sin(),
-                    theta.cos()
-                );
-                z += p.to_vec();
-            }
-
-            true
-        }
 
         let mut raw_vbuf = Vec::new();
         const RES: i32 = 50;
@@ -64,7 +30,7 @@ impl MeshBuffer {
                         (z as f64) / (RES as f64)
                     );
                     let m = (p.to_vec().magnitude() as f32).powf(8.0);
-                    if is_in_set(p) {
+                    if shape.contains(p) {
                         raw_vbuf.push(Vertex {
                             position: [p.x as f32, p.y as f32, p.z as f32],
                             color: [m, m, m],
@@ -77,7 +43,7 @@ impl MeshBuffer {
 
 
         let vbuf = VertexBuffer::new(facade, &raw_vbuf).unwrap();
-        println!("{:?}", vbuf.len());
+        debug!("{:?} points", vbuf.len());
 
         // Create and fill index buffer
         // let raw_ibuf = [0, 1, 2, 3, 4, 5];
