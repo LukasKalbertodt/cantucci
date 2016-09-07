@@ -4,6 +4,7 @@ use glium::backend::Facade;
 use glium::index::PrimitiveType;
 use glium::{VertexBuffer, IndexBuffer};
 use std::ops::Range;
+use util::ToArr;
 
 pub struct MeshBuffer {
     vbuf: VertexBuffer<Vertex>,
@@ -11,29 +12,34 @@ pub struct MeshBuffer {
 }
 
 impl MeshBuffer {
-    pub fn generate_for_cube<F, S>(facade: &F, cube: Range<Point3<f64>>, shape: &S) -> Self
+    pub fn generate_for_box<F, S>(
+        facade: &F,
+        boxr: Range<Point3<f64>>,
+        shape: &S,
+        resolution: u32
+    ) -> Self
         where F: Facade,
               S: Shape
     {
-        assert!(cube.start.x < cube.end.x);
-        assert!(cube.start.y < cube.end.y);
-        assert!(cube.start.z < cube.end.z);
+        assert!(boxr.start.x < boxr.end.x);
+        assert!(boxr.start.y < boxr.end.y);
+        assert!(boxr.start.z < boxr.end.z);
 
-        let mut raw_vbuf = Vec::new();
-        const RES: i32 = 50;
-        for x in -RES..RES {
-            for y in -RES..RES {
-                for z in -RES..RES {
-                    let p = Point3::new(
-                        (x as f64) / (RES as f64),
-                        (y as f64) / (RES as f64),
-                        (z as f64) / (RES as f64)
-                    );
+        let mut raw_vbuf = Vec::with_capacity(resolution.pow(3) as usize);
+
+        for x in 0..resolution {
+            for y in 0..resolution {
+                for z in 0..resolution {
+                    // Calculate the corresponding point in world space
+                    let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
+                    let p = boxr.start + (boxr.end - boxr.start).mul_element_wise(v);
+
+                    // "nice" coloring
                     let m = (p.to_vec().magnitude() as f32).powf(8.0);
                     if shape.contains(p) {
                         raw_vbuf.push(Vertex {
-                            position: [p.x as f32, p.y as f32, p.z as f32],
-                            color: [m, m, m],
+                            position: p.to_vec().cast::<f32>().to_arr(),
+                            color: [m; 3],
                         });
                     }
                 }
@@ -43,14 +49,12 @@ impl MeshBuffer {
 
 
         let vbuf = VertexBuffer::new(facade, &raw_vbuf).unwrap();
-        debug!("{:?} points", vbuf.len());
+        debug!("Generated {} points in {:?}", vbuf.len(), boxr);
 
         // Create and fill index buffer
-        // let raw_ibuf = [0, 1, 2, 3, 4, 5];
         let raw_ibuf: Vec<_> = (0..raw_vbuf.len() as u32).collect();
         let ibuf = IndexBuffer::new(
             facade,
-            // PrimitiveType::TrianglesList,
             PrimitiveType::Points,
             &raw_ibuf
         ).unwrap();

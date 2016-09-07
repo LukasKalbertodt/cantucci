@@ -21,10 +21,11 @@ pub struct FractalMesh<Sh> {
 
 impl<Sh: Shape> FractalMesh<Sh> {
     pub fn new<F: Facade>(facade: &F, shape: Sh) -> Self {
-        let buf = MeshBuffer::generate_for_cube(
+        let buf = MeshBuffer::generate_for_box(
             facade,
             Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0),
             &shape,
+            100,
         );
         let tree = Octree::Leaf(buf);
 

@@ -9,13 +9,22 @@ pub trait ToArr {
     fn to_arr(&self) -> Self::Output;
 }
 
-impl<T: BaseNum> ToArr for Matrix4<T> {
-    type Output = [[T; 4]; 4];
+macro_rules! to_arr_impl_gen_into_type {
+    ($ty:ident, $out:ty) => {
+        impl<T: BaseNum> ToArr for $ty <T> {
+            type Output = $out;
 
-    fn to_arr(&self) -> Self::Output {
-        (*self).into()
+            fn to_arr(&self) -> Self::Output {
+                (*self).into()
+            }
+        }
     }
 }
+
+to_arr_impl_gen_into_type!(Matrix4, [[T; 4]; 4]);
+to_arr_impl_gen_into_type!(Point3, [T; 3]);
+to_arr_impl_gen_into_type!(Vector3, [T; 3]);
+
 
 pub fn lerp<V, F>(a: V, b: V, t: F) -> V
     where V: Lerp<F>,
