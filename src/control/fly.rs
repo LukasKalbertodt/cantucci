@@ -14,6 +14,9 @@ const MAX_MOVE_SPEED: f64 = 1.0;
 /// '(MAX_MOVE_SPEED + x) / 2'.
 const MOVE_DELAY: f64 = 0.05;
 
+/// How much faster the move speed is when going into fast mode.
+const FAST_MOVE_MULTIPLIER: f64 = 3.0;
+
 /// Describes how much the angle of the look at vector is changed, when the
 /// mouse moves one pixel. This is doubled for phi, as its range is twice as
 /// big.
@@ -30,6 +33,7 @@ pub struct Fly {
     left_accel: f64,
     up_speed: f64,
     up_accel: f64,
+    faster: bool,
 }
 
 impl Fly {
@@ -48,6 +52,7 @@ impl Fly {
             left_accel: 0.0,
             up_speed: 0.0,
             up_accel: 0.0,
+            faster: false,
         }
     }
 
@@ -85,9 +90,15 @@ impl CamControl for Fly {
         update_speed(&mut self.left_speed, self.left_accel, delta);
         update_speed(&mut self.up_speed, self.up_accel, delta);
 
+        let speed_multiplier = if self.faster {
+            FAST_MOVE_MULTIPLIER
+        } else {
+            1.0
+        };
+
         let up_vec = Vector3::new(0.0, 0.0, 1.0);
         let left_vec = -self.cam.direction().cross(up_vec).normalize();
-        self.cam.position += delta * (
+        self.cam.position += speed_multiplier * delta * (
             self.cam.direction() * self.forward_speed +
             left_vec * self.left_speed +
             up_vec * self.up_speed
@@ -144,6 +155,9 @@ impl EventHandler for Fly {
                         => self.up_accel += 1.0,
                     (Pressed, Vkc::LControl) | (Released, Vkc::Space) if self.up_accel >= 0.0
                         => self.up_accel -= 1.0,
+
+                    (Pressed, Vkc::LShift) => self.faster = true,
+                    (Released, Vkc::LShift) => self.faster = false,
 
                     _ => return EventResponse::NotHandled,
                 }
