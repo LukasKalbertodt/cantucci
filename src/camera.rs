@@ -105,6 +105,11 @@ impl Projection {
         self.aspect_ratio = (width as f64) / (height as f64);
     }
 
+    /// Sets the aspect ratio to the aspect ratio of `other`
+    pub fn set_aspect_ratio_from(&mut self, other: &Self) {
+        self.aspect_ratio = other.aspect_ratio;
+    }
+
     /// Returns the matrix representing the projection transformation specified
     /// by the parameters in this struct.
     ///

@@ -87,7 +87,7 @@ impl EventHandler for Fly {
             use glium::glutin::VirtualKeyCode as Vkc;
 
             match (state, key) {
-                // Update accelerations for turning
+                // Update accelerations
                 (Pressed, Vkc::W) | (Released, Vkc::S) if self.forward_accel <= 0.0
                     => self.forward_accel += 1.0,
                 (Pressed, Vkc::S) | (Released, Vkc::W) if self.forward_accel >= 0.0

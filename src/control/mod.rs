@@ -69,8 +69,18 @@ impl<A: CamControl, B: CamControl> EventHandler for KeySwitcher<A, B> {
                 if key == self.switch_key =>
             {
                 match self.first_active {
-                    true => self.second.match_view(&self.first.camera()),
-                    false => self.first.match_view(&self.second.camera()),
+                    true => {
+                        self.second.match_view(&self.first.camera());
+                        self.second
+                            .projection_mut()
+                            .set_aspect_ratio_from(&self.first.camera().projection)
+                    }
+                    false => {
+                        self.first.match_view(&self.second.camera());
+                        self.first
+                            .projection_mut()
+                            .set_aspect_ratio_from(&self.second.camera().projection)
+                    }
                 }
                 self.first_active = !self.first_active;
 
@@ -96,7 +106,10 @@ impl<A: CamControl, B: CamControl> CamControl for KeySwitcher<A, B> {
                 self.first.camera().direction(),
                 self.amount_first,
             ),
-            self.first.camera().projection,
+            match self.first_active {
+                true => self.first.camera().projection,
+                false => self.second.camera().projection,
+            }
         )
     }
 
