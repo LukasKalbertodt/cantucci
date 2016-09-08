@@ -2,6 +2,13 @@ use std::ops::Range;
 use core::math::*;
 use cgmath;
 
+/// This camera implementation always uses (0, 0, 1) as up-vector. Because the
+/// direction vector must never be linear dependent to the up-vector, we have
+/// limit the possible values theta can take. This is the "safe zone" that theta
+/// must never be in; specifically '0...epsilon' and '(pi - epsilon)...pi'
+const THETA_SAFE_EPSILON: Rad<f64> = Rad(0.02);
+
+
 /// Saves the camera position and look direction as well as projection
 /// parameters.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -35,18 +42,22 @@ impl Camera {
     /// Sets the normalized, given vector as new direction vector.
     pub fn look_in(&mut self, dir: Vector3<f64>) {
         self.direction = dir.normalize();
+
+        let (theta, phi) = self.spherical_coords();
+        let theta = Self::clamp_theta(theta);
+        self.look_at_sphere(theta, phi);
+    }
+
+    /// Clamps theta into the allowed range
+    fn clamp_theta(theta: Rad<f64>) -> Rad<f64> {
+        use std::f64::consts::PI;
+
+        clamp(theta, THETA_SAFE_EPSILON, Rad(PI) - THETA_SAFE_EPSILON)
     }
 
     /// Sets the direction vector from the given spherical coordinates
-    pub fn look_at_sphere(&mut self, mut theta: Rad<f64>, phi: Rad<f64>) {
-        use std::f64::consts::PI;
-
-        if theta < Rad(0.05) {
-            theta = Rad(0.05);
-        }
-        if theta > Rad(PI - 0.05) {
-            theta = Rad(PI - 0.05);
-        }
+    pub fn look_at_sphere(&mut self, theta: Rad<f64>, phi: Rad<f64>) {
+        let theta = Self::clamp_theta(theta);
 
         self.direction = Vector3::new(
             theta.sin() * phi.cos(),
