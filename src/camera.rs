@@ -37,6 +37,24 @@ impl Camera {
         self.direction = dir.normalize();
     }
 
+    /// Sets the direction vector from the given spherical coordinates
+    pub fn look_at_sphere(&mut self, mut theta: Rad<f64>, phi: Rad<f64>) {
+        use std::f64::consts::PI;
+
+        if theta < Rad(0.05) {
+            theta = Rad(0.05);
+        }
+        if theta > Rad(PI - 0.05) {
+            theta = Rad(PI - 0.05);
+        }
+
+        self.direction = Vector3::new(
+            theta.sin() * phi.cos(),
+            theta.sin() * phi.sin(),
+            theta.cos(),
+        );
+    }
+
     /// Returns the current direction vector. It's guaranteed to be normalized.
     pub fn direction(&self) -> Vector3<f64> {
         self.direction

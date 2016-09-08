@@ -38,7 +38,7 @@ impl App {
         );
 
         let orbit = OrbitControl::around(Point3::new(0.0, 0.0, 0.0), proj);
-        let fly = FlyControl::new(orbit.camera().clone());
+        let fly = FlyControl::new(orbit.camera().clone(), &facade);
         let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
 
         Ok(App {

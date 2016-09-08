@@ -2,7 +2,6 @@ use camera::{Camera, Projection};
 use core::math::*;
 use event::{EventHandler, EventResponse};
 use glium::glutin::Event;
-use std::f64::consts::PI;
 use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which theta can change.
@@ -59,24 +58,6 @@ impl Orbit {
         }
     }
 
-    fn update_camera_from_theta_phi(&mut self, mut theta: Rad<f64>, phi: Rad<f64>) {
-        if theta < Rad(0.05) {
-            theta = Rad(0.05);
-        }
-        if theta > Rad(PI - 0.05) {
-            theta = Rad(PI - 0.05);
-        }
-
-        let eye_to_origin = Vector3::new(
-            theta.sin() * phi.cos(),
-            theta.sin() * phi.sin(),
-            theta.cos(),
-        );
-
-        self.cam.position = self.origin + self.distance * -eye_to_origin;
-        self.cam.look_in(eye_to_origin);
-    }
-
     fn update_distance(&mut self, distance: f64) {
         self.distance = distance;
         self.cam.position = self.origin + self.distance * -self.cam.direction();
@@ -110,7 +91,9 @@ impl CamControl for Orbit {
         let (mut theta, mut phi) = self.cam.spherical_coords();
         theta += self.theta_speed * delta;
         phi += self.phi_speed * delta;
-        self.update_camera_from_theta_phi(theta, phi);
+
+        self.cam.look_at_sphere(theta, phi);
+        self.cam.position = self.origin + self.distance * -self.cam.direction();
 
         // Update distance from origin
         let rate_of_change = self.zoom_speed * delta;

@@ -35,6 +35,12 @@ pub trait CamControl: EventHandler {
     /// *Note*: this only refers to the position and direction of the camera,
     /// not to projection parameters.
     fn match_view(&mut self, other: &Camera);
+
+    /// Is called when the control is activated
+    fn on_control_gain(&mut self) {}
+
+    /// Is called when the control is deactivated
+    fn on_control_loss(&mut self) {}
 }
 
 pub struct KeySwitcher<A, B> {
@@ -73,13 +79,17 @@ impl<A: CamControl, B: CamControl> EventHandler for KeySwitcher<A, B> {
                         self.second.match_view(&self.first.camera());
                         self.second
                             .projection_mut()
-                            .set_aspect_ratio_from(&self.first.camera().projection)
+                            .set_aspect_ratio_from(&self.first.camera().projection);
+                        self.first.on_control_loss();
+                        self.second.on_control_gain();
                     }
                     false => {
                         self.first.match_view(&self.second.camera());
                         self.first
                             .projection_mut()
-                            .set_aspect_ratio_from(&self.second.camera().projection)
+                            .set_aspect_ratio_from(&self.second.camera().projection);
+                        self.second.on_control_loss();
+                        self.first.on_control_gain();
                     }
                 }
                 self.first_active = !self.first_active;
