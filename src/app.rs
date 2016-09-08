@@ -29,7 +29,7 @@ impl App {
         );
 
         let mandelbulb = Mandelbulb::classic(20);
-        let mesh = FractalMesh::new(&facade, mandelbulb);
+        let mesh = try!(FractalMesh::new(&facade, mandelbulb));
 
         let proj = Projection::new(
             Rad(1.0),

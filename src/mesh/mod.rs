@@ -1,6 +1,7 @@
 use camera::Camera;
 use core::math::*;
 use core::Shape;
+use errors::*;
 use glium::backend::Facade;
 use glium::{self, DepthTest, Program, Surface, DrawParameters};
 use util::ToArr;
@@ -20,7 +21,9 @@ pub struct FractalMesh<Sh> {
 }
 
 impl<Sh: Shape> FractalMesh<Sh> {
-    pub fn new<F: Facade>(facade: &F, shape: Sh) -> Self {
+    pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
+        use util::gl::load_program;
+
         let buf = MeshBuffer::generate_for_box(
             facade,
             Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0),
@@ -29,53 +32,16 @@ impl<Sh: Shape> FractalMesh<Sh> {
         );
         let tree = Octree::Leaf(buf);
 
+        let prog = try!(
+            load_program(facade, "point-cloud-mandelbulb")
+                .chain_err(|| "loading program for fractal mesh failed")
+        );
 
-        // Create program
-        let vertex_shader_src = r#"
-            #version 400
-            uniform dmat4 view_matrix;
-            uniform dmat4 proj_matrix;
-
-            out float z;
-            out vec3 ocolor;
-
-            in vec3 position;
-            in vec3 color;
-            void main() {
-                z = position.z;
-                ocolor = color;
-
-                gl_Position = vec4(
-                    proj_matrix *
-                    view_matrix *
-                    vec4(position, 1.0)
-                );
-            }
-        "#;
-
-        let fragment_shader_src = r#"
-            #version 140
-            out vec4 color;
-            in vec3 ocolor;
-            in float z;
-            void main() {
-                color = vec4(ocolor, 1.0);
-            }
-        "#;
-
-        let program = Program::from_source(
-            facade,
-            vertex_shader_src,
-            fragment_shader_src,
-            None
-        ).unwrap();
-
-
-        FractalMesh {
+        Ok(FractalMesh {
             buffer: tree,
-            program: program,
+            program: prog,
             shape: shape,
-        }
+        })
     }
 
     pub fn draw<S: Surface>(&self, surface: &mut S, camera: &Camera) {

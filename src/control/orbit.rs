@@ -93,8 +93,6 @@ impl CamControl for Orbit {
     }
 
     fn update(&mut self, delta: f64) {
-        use util::lerp;
-
         // Update the theta and phi turning speeds
         self.theta_speed = lerp(
             self.theta_speed,

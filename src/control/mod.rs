@@ -2,7 +2,7 @@ use glium::glutin::VirtualKeyCode;
 use camera::{Camera, Projection};
 use glium::glutin::Event;
 use event::{EventHandler, EventResponse};
-use util::{clamp, lerp};
+use core::math::*;
 
 mod fly;
 mod orbit;

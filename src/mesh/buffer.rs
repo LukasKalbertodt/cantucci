@@ -49,7 +49,7 @@ impl MeshBuffer {
 
 
         let vbuf = VertexBuffer::new(facade, &raw_vbuf).unwrap();
-        debug!("Generated {} points in {:?}", vbuf.len(), boxr);
+        debug!("Generated {} points in box ({:?})", vbuf.len(), boxr);
 
         // Create and fill index buffer
         let raw_ibuf: Vec<_> = (0..raw_vbuf.len() as u32).collect();
