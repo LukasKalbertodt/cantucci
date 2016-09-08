@@ -86,7 +86,7 @@ impl CamControl for Fly {
         update_speed(&mut self.up_speed, self.up_accel, delta);
 
         let up_vec = Vector3::new(0.0, 0.0, 1.0);
-        let left_vec = -self.cam.direction().cross(up_vec);
+        let left_vec = -self.cam.direction().cross(up_vec).normalize();
         self.cam.position += delta * (
             self.cam.direction() * self.forward_speed +
             left_vec * self.left_speed +
