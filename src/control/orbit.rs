@@ -44,7 +44,7 @@ impl Orbit {
     /// projection.
     pub fn around(origin: Point3<f64>, proj: Projection) -> Self {
         let init_dir = Vector3::new(1.0, 0.0, 0.0).normalize();
-        let distance = 5.0;
+        let distance = 3.0;
 
         Orbit {
             origin: origin,
