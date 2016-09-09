@@ -4,6 +4,7 @@ use core::Shape;
 use errors::*;
 use glium::backend::Facade;
 use glium::{self, DepthTest, Program, Surface, DrawParameters};
+use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use threadpool::ThreadPool;
 use util::ToArr;
@@ -36,7 +37,9 @@ impl<Sh: Shape + 'static> FractalMesh<Sh> {
 
 
         let (tx, rx) = channel();
-        let pool = ThreadPool::new(8);  // TODO: fix number of threads
+        let num_threads = num_cpus::get();
+        let pool = ThreadPool::new(num_threads);
+        info!("Using {} threads to generate fractal", num_threads);
 
         let _ = tree.root_mut().split();
         for c in tree.root().children().unwrap() {
