@@ -24,22 +24,34 @@ impl<T> Octree<T> {
         }
     }
 
+    /// Returns the span of the root element
+    pub fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    pub fn root(&self) -> NodeEntry<T> {
+        NodeEntry {
+            node: &self.root,
+            span: self.span(),
+        }
+    }
+
+    pub fn root_mut(&mut self) -> NodeEntryMut<T> {
+        NodeEntryMut {
+            span: self.span(),
+            node: &mut self.root,
+        }
+    }
+
     /// Returns an iterator over *im*mutable nodes
     pub fn iter(&self) -> Iter<T> {
         Iter {
             to_visit: vec![
                 NodeEntry {
                     node: &self.root,
-                    span: self.span.clone(),
+                    span: self.span(),
                 }
             ]
-        }
-    }
-
-    /// Returns an iterator over *mutable* nodes
-    pub fn iter_mut(&mut self) -> IterMut<T> {
-        IterMut {
-            to_visit: vec![&mut self.root],
         }
     }
 }
@@ -53,14 +65,6 @@ impl<'a, T> IntoIterator for &'a Octree<T> {
         self.iter()
     }
 }
-// impl<'a, T: Clone> IntoIterator for &'a mut Octree<T> {
-//     type Item = NodeEntry<'a, T>;
-//     type IntoIter = IterMut<'a, T>;
-
-//     fn into_iter(self) -> Self::IntoIter {
-//         self.iter_mut()
-//     }
-// }
 
 /// One node of the octree. This type is implementation detail of the data
 /// structure and isn't usually exposed to the user.
@@ -86,7 +90,8 @@ enum Octnode<T> {
 
 // ===========================================================================
 
-/// A reference to a node inside the tree that knows about its span.
+/// An *im*mutable reference to a node inside the tree that knows about its
+/// span.
 pub struct NodeEntry<'a, T: 'a> {
     node: &'a Octnode<T>,
     span: Span,
@@ -115,7 +120,7 @@ impl<'a, T> NodeEntry<'a, T> {
         }
     }
 
-    /// If the referenced node `n` is *not+ a leaf node, eight `NodeEntry`s
+    /// If the referenced node `n` is *not* a leaf node, eight `NodeEntry`s
     /// referencing all eight children of `n` are returned; `None` otherwise.
     pub fn children(&self) -> Option<[Self; 8]> {
         match *self.node {
@@ -157,19 +162,56 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
     }
 }
 
-/// An iterator over *mutable* references of nodes
-pub struct IterMut<'a, T: 'a> {
-    to_visit: Vec<&'a mut Octnode<T>>,
+// ===========================================================================
+
+/// A *mutable* reference to a node inside the tree that knows about its span.
+pub struct NodeEntryMut<'a, T: 'a> {
+    node: &'a mut Octnode<T>,
+    span: Span,
 }
 
-impl<'a, T: 'a> Iterator for IterMut<'a, T> {
-    type Item = &'a mut Option<T>;
 
-    fn next<'b>(&'b mut self) -> Option<&'a mut Option<T>> {
-        let next: &'a mut Octnode<T> = self.to_visit.pop().unwrap();
+impl<'a, T> NodeEntryMut<'a, T> {
+    /// Returns `true` if the referenced node is a leaf node
+    pub fn is_leaf(&self) -> bool {
+        match *self.node {
+            Octnode::Leaf(_) => true,
+            _ => false,
+        }
+    }
 
-        match *next {
-            Octnode::Leaf(ref mut inner) => Some(inner),
+    /// Returns the span of the referenced node
+    pub fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    /// If the referenced node is a leaf node and this leaf node contains a
+    /// value, that value is returned; `None` otherwise.
+    pub fn leaf_data(&'a mut self) -> Option<&'a mut Option<T>> {
+        match *self.node {
+            Octnode::Leaf(ref mut data) => Some(data),
+            _ => None,
+        }
+    }
+
+    /// If the referenced node `n` is *not* a leaf node, eight `NodeEntry`s
+    /// referencing all eight children of `n` are returned; `None` otherwise.
+    pub fn into_children(self) -> Option<[Self; 8]> {
+        match *self.node {
+            Octnode::SubTree(ref mut children) => {
+                // TODO: fix span
+                let mut iter = children.iter_mut();
+                Some([
+                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
+                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
+                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
+                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
+                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
+                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
+                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
+                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
+                ])
+            },
             _ => None,
         }
     }

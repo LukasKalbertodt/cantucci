@@ -34,7 +34,7 @@ impl<Sh: Shape> FractalMesh<Sh> {
             Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0)
         );
 
-        *tree.iter_mut().next().unwrap() = Some(buf);
+        *tree.root_mut().leaf_data().unwrap() = Some(buf);
 
         let prog = try!(
             load_program(facade, "point-cloud-mandelbulb")
