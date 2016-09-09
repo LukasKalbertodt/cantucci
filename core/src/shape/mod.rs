@@ -6,6 +6,6 @@ mod mandelbulb;
 pub use self::sphere::*;
 pub use self::mandelbulb::*;
 
-pub trait Shape {
+pub trait Shape: Send + Clone {
     fn contains(&self, p: Point3<f64>) -> bool;
 }

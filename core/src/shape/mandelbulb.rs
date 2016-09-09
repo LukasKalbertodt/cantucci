@@ -1,5 +1,6 @@
 use math::*;
 
+#[derive(Clone)]
 pub struct Mandelbulb {
     power: f64,
     max_iters: u64,

@@ -8,6 +8,7 @@ extern crate cgmath;
 extern crate core;
 extern crate env_logger;
 extern crate term_painter;
+extern crate threadpool;
 
 
 mod app;

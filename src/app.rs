@@ -69,6 +69,7 @@ impl App {
             let delta_sec = (delta.subsec_nanos() / 1000) as f64 / 1_000_000.0;
 
             self.control.update(delta_sec);
+            self.mesh.update(&self.facade);
 
             last_time = Instant::now();
 

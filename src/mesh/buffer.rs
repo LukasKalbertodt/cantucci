@@ -3,27 +3,23 @@ use core::Shape;
 use glium::backend::Facade;
 use glium::index::PrimitiveType;
 use glium::{VertexBuffer, IndexBuffer};
-use std::ops::Range;
+use mesh::octree::Span;
 use util::ToArr;
 
 pub struct MeshBuffer {
-    vbuf: VertexBuffer<Vertex>,
-    ibuf: IndexBuffer<u32>,
+    raw_vbuf: Vec<Vertex>,
+    raw_ibuf: Vec<u32>,
 }
 
 impl MeshBuffer {
-    pub fn generate_for_box<F, S>(
-        facade: &F,
-        boxr: Range<Point3<f64>>,
+    pub fn generate_for_box<S: Shape>(
+        span: &Span,
         shape: &S,
-        resolution: u32
-    ) -> Self
-        where F: Facade,
-              S: Shape
-    {
-        assert!(boxr.start.x < boxr.end.x);
-        assert!(boxr.start.y < boxr.end.y);
-        assert!(boxr.start.z < boxr.end.z);
+        resolution: u32,
+    ) -> Self {
+        assert!(span.start.x < span.end.x);
+        assert!(span.start.y < span.end.y);
+        assert!(span.start.z < span.end.z);
 
         let mut raw_vbuf = Vec::with_capacity(resolution.pow(3) as usize);
 
@@ -32,7 +28,7 @@ impl MeshBuffer {
                 for z in 0..resolution {
                     // Calculate the corresponding point in world space
                     let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
-                    let p = boxr.start + (boxr.end - boxr.start).mul_element_wise(v);
+                    let p = span.start + (span.end - span.start).mul_element_wise(v);
 
                     // "nice" coloring
                     let m = (p.to_vec().magnitude() as f32).powf(8.0);
@@ -46,22 +42,38 @@ impl MeshBuffer {
             }
         }
 
+        // Fill index buffer
+        let raw_ibuf = (0..raw_vbuf.len() as u32).collect();
 
+        debug!("Generated {} points in box ({:?})", raw_vbuf.len(), span);
 
-        let vbuf = VertexBuffer::new(facade, &raw_vbuf).unwrap();
-        debug!("Generated {} points in box ({:?})", vbuf.len(), boxr);
+        MeshBuffer {
+            raw_vbuf: raw_vbuf,
+            raw_ibuf: raw_ibuf,
+        }
+    }
+}
 
-        // Create and fill index buffer
-        let raw_ibuf: Vec<_> = (0..raw_vbuf.len() as u32).collect();
+pub struct MeshView {
+    vbuf: VertexBuffer<Vertex>,
+    ibuf: IndexBuffer<u32>,
+    raw_buf: MeshBuffer,
+}
+
+impl MeshView {
+    pub fn from_raw_buf<F: Facade>(buf: MeshBuffer, facade: &F) -> Self {
+        let vbuf = VertexBuffer::new(facade, &buf.raw_vbuf).unwrap();
+
         let ibuf = IndexBuffer::new(
             facade,
             PrimitiveType::Points,
-            &raw_ibuf
+            &buf.raw_ibuf
         ).unwrap();
 
-        MeshBuffer {
+        MeshView {
             vbuf: vbuf,
             ibuf: ibuf,
+            raw_buf: buf,
         }
     }
 

@@ -4,23 +4,28 @@ use core::Shape;
 use errors::*;
 use glium::backend::Facade;
 use glium::{self, DepthTest, Program, Surface, DrawParameters};
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use threadpool::ThreadPool;
 use util::ToArr;
 
 mod octree;
 mod buffer;
 
-use self::octree::{Octree, NodeEntryMut};
-use self::buffer::MeshBuffer;
+use self::octree::{Octree, SpanExt};
+use self::buffer::{MeshBuffer, MeshView};
 
 /// Type to manage the graphical representation of the fractal. It updates the
 /// internal data depending on the camera position and resolution.
 pub struct FractalMesh<Sh> {
-    buffer: Octree<MeshBuffer>,
+    tree: Octree<MeshView>,
     program: Program,
     shape: Sh,
+    thread_pool: ThreadPool,
+    new_meshes: Receiver<(Point3<f64>, MeshBuffer)>,
+    mesh_tx: Sender<(Point3<f64>, MeshBuffer)>,
 }
 
-impl<Sh: Shape> FractalMesh<Sh> {
+impl<Sh: Shape + 'static> FractalMesh<Sh> {
     pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
         use util::gl::load_program;
 
@@ -29,12 +34,25 @@ impl<Sh: Shape> FractalMesh<Sh> {
             Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0)
         );
 
-        {
-            let mut root = tree.root_mut();
-            let _ = root.split();
-            for c in root.into_children().unwrap() {
-                Self::fill_leaf(c, &shape, facade);
-            }
+
+        let (tx, rx) = channel();
+        let pool = ThreadPool::new(8);  // TODO: fix number of threads
+
+        let _ = tree.root_mut().split();
+        for c in tree.root().children().unwrap() {
+            // prepare values to be moved into the closure
+            let tx = tx.clone();
+            let span = c.span();
+            let shape = shape.clone();
+
+            pool.execute(move || {
+                let buf = MeshBuffer::generate_for_box(&span, &shape, 80);
+                let res = tx.send((span.center(), buf));
+
+                if res.is_err() {
+                    debug!("main thread has hung up, my work was for nothing!");
+                }
+            });
         }
 
         let prog = try!(
@@ -43,26 +61,30 @@ impl<Sh: Shape> FractalMesh<Sh> {
         );
 
         Ok(FractalMesh {
-            buffer: tree,
+            tree: tree,
             program: prog,
             shape: shape,
+            thread_pool: pool,
+            new_meshes: rx,
+            mesh_tx: tx,
         })
     }
 
-    fn fill_leaf<'a, F: Facade>(
-        mut leaf: NodeEntryMut<'a, MeshBuffer>,
-        shape: &Sh,
-        facade: &F
-    ) {
-        assert!(leaf.is_leaf());
+    pub fn update<F: Facade>(&mut self, facade: &F) {
+        loop {
+            match self.new_meshes.try_recv() {
+                Ok((center, buf)) => {
+                    let mesh_view = MeshView::from_raw_buf(buf, facade);
 
-        let buf = MeshBuffer::generate_for_box(
-            facade,
-            leaf.span(),
-            shape,
-            50,
-        );
-        *leaf.leaf_data().unwrap() = Some(buf);
+                    *self.tree
+                        .leaf_mut_around(center)
+                        .leaf_data()
+                        .unwrap() = Some(mesh_view);
+                }
+                Err(TryRecvError::Empty) => break,
+                _ => panic!(),
+            }
+        }
     }
 
     pub fn draw<S: Surface>(&mut self, surface: &mut S, camera: &Camera) {
@@ -82,7 +104,7 @@ impl<Sh: Shape> FractalMesh<Sh> {
             .. DrawParameters::default()
         };
 
-        for entry in self.buffer.iter() {
+        for entry in &self.tree {
             if let Some(buf) = entry.leaf_data() {
                 surface.draw(
                     buf.vbuf(),

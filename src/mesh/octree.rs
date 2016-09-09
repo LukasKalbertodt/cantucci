@@ -5,6 +5,25 @@ use arrayvec::ArrayVec;
 /// A box in three dimensional space that is represented by one octree node
 pub type Span = Range<Point3<f64>>;
 
+pub trait SpanExt {
+    fn center(&self) -> Point3<f64>;
+    fn contains(&self, p: Point3<f64>) -> bool;
+}
+
+impl SpanExt for Span {
+    fn center(&self) -> Point3<f64> {
+        self.start + (self.end - self.start) / 2.0
+    }
+
+    fn contains(&self, p: Point3<f64>) -> bool {
+        let s = self.start;
+        let e = self.end;
+
+        s.x < p.x && s.y < p.y && s.z < p.z
+            && p.x < e.x && p.y < e.y && p.z < e.z
+    }
+}
+
 /// Recursively partitions three dimensional space into eight octants. In this
 /// simple implementation all octants have the same size.
 ///
@@ -40,6 +59,26 @@ impl<T> Octree<T> {
         NodeEntryMut {
             span: self.span(),
             node: &mut self.root,
+        }
+    }
+
+    // pub fn leaf_around(&self) -> NodeEntry<T> {
+
+    // }
+
+    pub fn leaf_mut_around(&mut self, p: Point3<f64>) -> NodeEntryMut<T> {
+        let mut node = self.root_mut();
+        loop {
+            if node.is_leaf() {
+                return node;
+            } else {
+                node = node
+                    .into_children()
+                    .unwrap()
+                    .into_iter()
+                    .find(|c| c.span().contains(p))
+                    .unwrap();
+            }
         }
     }
 
