@@ -9,6 +9,7 @@ use util::ToArr;
 pub struct MeshBuffer {
     raw_vbuf: Vec<Vertex>,
     raw_ibuf: Vec<u32>,
+    resolution: u32,
 }
 
 impl MeshBuffer {
@@ -20,6 +21,8 @@ impl MeshBuffer {
         assert!(span.start.x < span.end.x);
         assert!(span.start.y < span.end.y);
         assert!(span.start.z < span.end.z);
+
+        debug!("Starting to generate in {:?} @ {} res", span, resolution);
 
         let mut raw_vbuf = Vec::with_capacity(resolution.pow(3) as usize);
 
@@ -45,12 +48,22 @@ impl MeshBuffer {
         // Fill index buffer
         let raw_ibuf = (0..raw_vbuf.len() as u32).collect();
 
-        debug!("Generated {} points in box ({:?})", raw_vbuf.len(), span);
+        debug!(
+            "Generated {} points in box ({:?}) @ {} res",
+            raw_vbuf.len(),
+            span,
+            resolution,
+        );
 
         MeshBuffer {
             raw_vbuf: raw_vbuf,
             raw_ibuf: raw_ibuf,
+            resolution: resolution,
         }
+    }
+
+    pub fn resolution(&self) -> u32 {
+        self.resolution
     }
 }
 
@@ -83,6 +96,10 @@ impl MeshView {
 
     pub fn ibuf(&self) -> &IndexBuffer<u32> {
         &self.ibuf
+    }
+
+    pub fn raw_buf(&self) -> &MeshBuffer {
+        &self.raw_buf
     }
 }
 
