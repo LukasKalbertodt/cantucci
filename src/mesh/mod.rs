@@ -129,7 +129,7 @@ impl<Sh: Shape + 'static> FractalMesh<Sh> {
                     let leaf_res = view.raw_buf().resolution();
                     leaf_res < desired_res.min || leaf_res > desired_res.max
                 }
-                Some(MeshStatus::Requested) => false,
+                Some(MeshStatus::Requested { .. }) => false,
                 None => desired_res.desired > 0,
             };
 
@@ -150,7 +150,14 @@ impl<Sh: Shape + 'static> FractalMesh<Sh> {
                 });
 
                 self.active_jobs += 1;
-                *leaf.leaf_data().unwrap() = Some(MeshStatus::Requested);
+
+                let old_view = match leaf.leaf_data().unwrap().take() {
+                    Some(MeshStatus::Ready(view)) => Some(view),
+                    _ => None,
+                };
+                *leaf.leaf_data().unwrap() = Some(MeshStatus::Requested {
+                    old_view: old_view,
+                });
             }
         }
 
@@ -177,20 +184,26 @@ impl<Sh: Shape + 'static> FractalMesh<Sh> {
         };
 
         for entry in &self.tree {
-            if let Some(&MeshStatus::Ready(ref view)) = entry.leaf_data() {
-                surface.draw(
-                    view.vbuf(),
-                    view.ibuf(),
-                    &self.program,
-                    &uniforms,
-                    &params,
-                ).expect("drawing on surface failed!");
+            match entry.leaf_data() {
+                Some(&MeshStatus::Ready(ref view)) |
+                Some(&MeshStatus::Requested { old_view: Some(ref view) }) => {
+                    surface.draw(
+                        view.vbuf(),
+                        view.ibuf(),
+                        &self.program,
+                        &uniforms,
+                        &params,
+                    ).expect("drawing on surface failed!");
+                }
+                _ => (),
             }
         }
     }
 }
 
 enum MeshStatus {
-    Requested,
+    Requested {
+        old_view: Option<MeshView>,
+    },
     Ready(MeshView),
 }
