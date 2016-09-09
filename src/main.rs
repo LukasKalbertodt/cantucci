@@ -3,6 +3,7 @@
 #[macro_use] extern crate error_chain;
 #[macro_use] extern crate glium;
 #[macro_use] extern crate log;
+extern crate arrayvec;
 extern crate cgmath;
 extern crate core;
 extern crate env_logger;

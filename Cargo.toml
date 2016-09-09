@@ -8,9 +8,10 @@ authors = [
 
 [dependencies]
 core = { path = "core/" }
-glium = "0.15"
+arrayvec = "0.3"
 cgmath = "0.11.0"
-error-chain = "0.4"
-log = "0.3"
 env_logger = "0.3"
+error-chain = "0.4"
+glium = "0.15"
+log = "0.3"
 term-painter = "0.2"

@@ -30,7 +30,11 @@ impl<Sh: Shape> FractalMesh<Sh> {
             &shape,
             100,
         );
-        let tree = Octree::Leaf(buf);
+        let mut tree = Octree::spanning(
+            Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0)
+        );
+
+        *tree.iter_mut().next().unwrap() = Some(buf);
 
         let prog = try!(
             load_program(facade, "point-cloud-mandelbulb")
@@ -44,7 +48,7 @@ impl<Sh: Shape> FractalMesh<Sh> {
         })
     }
 
-    pub fn draw<S: Surface>(&self, surface: &mut S, camera: &Camera) {
+    pub fn draw<S: Surface>(&mut self, surface: &mut S, camera: &Camera) {
         let uniforms = uniform! {
             view_matrix: camera.view_transform().to_arr(),
             proj_matrix: camera.proj_transform().to_arr(),
@@ -61,8 +65,8 @@ impl<Sh: Shape> FractalMesh<Sh> {
             .. DrawParameters::default()
         };
 
-        match self.buffer {
-            Octree::Leaf(ref buf) => {
+        for entry in self.buffer.iter() {
+            if let Some(buf) = entry.leaf_data() {
                 surface.draw(
                     buf.vbuf(),
                     buf.ibuf(),
@@ -71,7 +75,6 @@ impl<Sh: Shape> FractalMesh<Sh> {
                     &params,
                 ).expect("drawing on surface failed!");
             }
-            _ => unimplemented!(),
         }
     }
 }
