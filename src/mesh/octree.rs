@@ -90,6 +90,17 @@ enum Octnode<T> {
 
 // ===========================================================================
 
+const SPLIT_SPAN_DIFF_AMOUNT: &'static [Vector3<f64>; 8] = &[
+    Vector3 { x: 0.0, y: 0.0, z: 0.0 },
+    Vector3 { x: 0.0, y: 0.0, z: 1.0 },
+    Vector3 { x: 0.0, y: 1.0, z: 0.0 },
+    Vector3 { x: 0.0, y: 1.0, z: 1.0 },
+    Vector3 { x: 1.0, y: 0.0, z: 0.0 },
+    Vector3 { x: 1.0, y: 0.0, z: 1.0 },
+    Vector3 { x: 1.0, y: 1.0, z: 0.0 },
+    Vector3 { x: 1.0, y: 1.0, z: 1.0 },
+];
+
 /// An *im*mutable reference to a node inside the tree that knows about its
 /// span.
 pub struct NodeEntry<'a, T: 'a> {
@@ -122,20 +133,26 @@ impl<'a, T> NodeEntry<'a, T> {
 
     /// If the referenced node `n` is *not* a leaf node, eight `NodeEntry`s
     /// referencing all eight children of `n` are returned; `None` otherwise.
-    pub fn children(&self) -> Option<[Self; 8]> {
+    pub fn children(&self) -> Option<ArrayVec<[Self; 8]>> {
         match *self.node {
             Octnode::SubTree(ref children) => {
-                // TODO: fix span
-                Some([
-                    NodeEntry { node: &children[0], span: self.span.clone() },
-                    NodeEntry { node: &children[1], span: self.span.clone() },
-                    NodeEntry { node: &children[2], span: self.span.clone() },
-                    NodeEntry { node: &children[3], span: self.span.clone() },
-                    NodeEntry { node: &children[4], span: self.span.clone() },
-                    NodeEntry { node: &children[5], span: self.span.clone() },
-                    NodeEntry { node: &children[6], span: self.span.clone() },
-                    NodeEntry { node: &children[7], span: self.span.clone() },
-                ])
+                let start = self.span.start;
+                let half_diff = (self.span.end - start) / 2.0;
+
+                Some(children
+                    .iter()
+                    .zip(SPLIT_SPAN_DIFF_AMOUNT)
+                    .map(|(child, &diff_amount)| {
+                        let child_start = start + half_diff.mul_element_wise(diff_amount);
+                        let child_end = child_start + half_diff;
+
+                        NodeEntry {
+                            node: child,
+                            span: child_start .. child_end,
+                        }
+                    })
+                    .collect()
+                )
             },
             _ => None,
         }
@@ -187,7 +204,7 @@ impl<'a, T> NodeEntryMut<'a, T> {
 
     /// If the referenced node is a leaf node and this leaf node contains a
     /// value, that value is returned; `None` otherwise.
-    pub fn leaf_data(&'a mut self) -> Option<&'a mut Option<T>> {
+    pub fn leaf_data<'b>(&'b mut self) -> Option<&'b mut Option<T>> {
         match *self.node {
             Octnode::Leaf(ref mut data) => Some(data),
             _ => None,
@@ -196,23 +213,51 @@ impl<'a, T> NodeEntryMut<'a, T> {
 
     /// If the referenced node `n` is *not* a leaf node, eight `NodeEntry`s
     /// referencing all eight children of `n` are returned; `None` otherwise.
-    pub fn into_children(self) -> Option<[Self; 8]> {
+    pub fn into_children(self) -> Option<ArrayVec<[Self; 8]>> {
         match *self.node {
             Octnode::SubTree(ref mut children) => {
-                // TODO: fix span
-                let mut iter = children.iter_mut();
-                Some([
-                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
-                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
-                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
-                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
-                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
-                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
-                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
-                    NodeEntryMut { node: iter.next().unwrap(), span: self.span.clone() },
-                ])
+                let start = self.span.start;
+                let half_diff = (self.span.end - start) / 2.0;
+
+                Some(children
+                    .iter_mut()
+                    .zip(SPLIT_SPAN_DIFF_AMOUNT)
+                    .map(|(child, &diff_amount)| {
+                        let child_start = start + half_diff.mul_element_wise(diff_amount);
+                        let child_end = child_start + half_diff;
+
+                        NodeEntryMut {
+                            node: child,
+                            span: child_start .. child_end,
+                        }
+                    })
+                    .collect()
+                )
             },
             _ => None,
         }
+    }
+
+    /// Splits the `self` leaf into eight children and returns the data of
+    /// the split leaf. *Note*: the referenced node has to be a leaf!
+    pub fn split(&mut self) -> Option<T> {
+        use std::iter;
+
+        assert!(self.is_leaf());
+
+
+        let out = match *self.node {
+            Octnode::Leaf(ref mut data) => data.take(),
+            _ => unreachable!(),
+        };
+
+        let eight_nones = iter::repeat(()).map(|_| Octnode::Leaf(None));
+        let empty_children: ArrayVec<_> = eight_nones.collect();
+
+        *self.node = Octnode::SubTree(
+            Box::new(empty_children.into_inner().ok().unwrap())
+        );
+
+        out
     }
 }

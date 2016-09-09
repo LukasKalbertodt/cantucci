@@ -9,7 +9,7 @@ use util::ToArr;
 mod octree;
 mod buffer;
 
-use self::octree::Octree;
+use self::octree::{Octree, NodeEntryMut};
 use self::buffer::MeshBuffer;
 
 /// Type to manage the graphical representation of the fractal. It updates the
@@ -24,17 +24,18 @@ impl<Sh: Shape> FractalMesh<Sh> {
     pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
         use util::gl::load_program;
 
-        let buf = MeshBuffer::generate_for_box(
-            facade,
-            Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0),
-            &shape,
-            100,
-        );
+
         let mut tree = Octree::spanning(
             Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0)
         );
 
-        *tree.root_mut().leaf_data().unwrap() = Some(buf);
+        {
+            let mut root = tree.root_mut();
+            let _ = root.split();
+            for c in root.into_children().unwrap() {
+                Self::fill_leaf(c, &shape, facade);
+            }
+        }
 
         let prog = try!(
             load_program(facade, "point-cloud-mandelbulb")
@@ -46,6 +47,22 @@ impl<Sh: Shape> FractalMesh<Sh> {
             program: prog,
             shape: shape,
         })
+    }
+
+    fn fill_leaf<'a, F: Facade>(
+        mut leaf: NodeEntryMut<'a, MeshBuffer>,
+        shape: &Sh,
+        facade: &F
+    ) {
+        assert!(leaf.is_leaf());
+
+        let buf = MeshBuffer::generate_for_box(
+            facade,
+            leaf.span(),
+            shape,
+            50,
+        );
+        *leaf.leaf_data().unwrap() = Some(buf);
     }
 
     pub fn draw<S: Surface>(&mut self, surface: &mut S, camera: &Camera) {
