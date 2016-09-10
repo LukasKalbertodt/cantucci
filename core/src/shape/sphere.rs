@@ -1,4 +1,5 @@
 use math::*;
+use super::{DistanceApprox, Shape};
 
 #[derive(Clone)]
 pub struct Sphere {
@@ -15,8 +16,16 @@ impl Sphere {
     }
 }
 
-impl super::Shape for Sphere {
+impl Shape for Sphere {
     fn contains(&self, p: Point3<f64>) -> bool {
         (self.center - p).magnitude2() <= (self.radius * self.radius)
+    }
+
+    fn distance(&self, p: Point3<f64>) -> DistanceApprox {
+        let d = ((self.center - p).magnitude() - self.radius).abs() ;
+        DistanceApprox {
+            min: d,
+            max: d,
+        }
     }
 }

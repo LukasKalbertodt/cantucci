@@ -1,4 +1,5 @@
 use math::*;
+use super::{DistanceApprox, Shape};
 
 #[derive(Clone)]
 pub struct Mandelbulb {
@@ -19,7 +20,7 @@ impl Mandelbulb {
     }
 }
 
-impl super::Shape for Mandelbulb {
+impl Shape for Mandelbulb {
     fn contains(&self, p: Point3<f64>) -> bool {
         const BAILOUT: f64 = 2.5;
 
@@ -55,5 +56,46 @@ impl super::Shape for Mandelbulb {
         // The point didn't diverge within `max_iters`, so we assume it's in
         // the set
         true
+    }
+
+    fn distance(&self, p: Point3<f64>) -> DistanceApprox {
+        let mut z = p;
+        let mut dr = 1.0;
+        let mut r = 0.0;
+
+        const BAILOUT: f64 = 2.5;
+
+        for _ in 0..self.max_iters {
+
+            r = z.to_vec().magnitude();
+            if r > BAILOUT {
+                break;
+            }
+
+            // convert to polar coordinates
+            let theta = (z.z / r).acos();
+            let phi = f64::atan2(z.y, z.x);
+            dr = r.powf(self.power - 1.0) * self.power * dr + 1.0;
+
+            // scale and rotate the point
+            let zr = r.powf(self.power);
+            let theta = theta * self.power;
+            let phi = phi * self.power;
+
+            // convert back to cartesian coordinates
+            z = zr * Point3::new(
+                theta.sin() * phi.cos(),
+                phi.sin() * theta.sin(),
+                theta.cos()
+            );
+            z += p.to_vec();
+        }
+
+        let lower = 0.5 * r.ln() * r / dr;
+
+        DistanceApprox {
+            min: lower,
+            max: 4.0 * lower,
+        }
     }
 }

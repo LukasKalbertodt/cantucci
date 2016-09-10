@@ -1,5 +1,6 @@
 use camera::{Camera, Projection};
 use core::math::*;
+use core::Shape;
 use event::{EventHandler, EventResponse};
 use glium::glutin::Event;
 use super::CamControl;
@@ -73,7 +74,7 @@ impl CamControl for Orbit {
         &mut self.cam.projection
     }
 
-    fn update(&mut self, delta: f64) {
+    fn update(&mut self, delta: f64, _: &Shape) {
         // Update the theta and phi turning speeds
         self.theta_speed = lerp(
             self.theta_speed,

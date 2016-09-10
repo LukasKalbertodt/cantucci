@@ -3,7 +3,7 @@ use control::Orbit as OrbitControl;
 use control::Fly as FlyControl;
 use control::{CamControl, KeySwitcher};
 use core::math::*;
-use core::shape::Mandelbulb;
+use core::shape::{Mandelbulb, Sphere};
 use errors::*;
 use event::{EventResponse, poll_events_with, QuitHandler};
 use glium::backend::glutin_backend::GlutinFacade;
@@ -15,6 +15,7 @@ pub struct App {
     facade: GlutinFacade,
     control: Box<CamControl>,
     mesh: FractalMesh<Mandelbulb>,
+    // mesh: FractalMesh<Sphere>,
     print_fps: bool,
 }
 
@@ -28,8 +29,9 @@ impl App {
             create_context().chain_err(|| "failed to create GL context")
         );
 
-        let mandelbulb = Mandelbulb::classic(20);
-        let mesh = try!(FractalMesh::new(&facade, mandelbulb));
+        let shape = Mandelbulb::classic(20);
+        // let shape = Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0);
+        let mesh = try!(FractalMesh::new(&facade, shape));
 
         let proj = Projection::new(
             Rad(1.0),
@@ -68,7 +70,7 @@ impl App {
             let delta = Instant::now() - last_time;
             let delta_sec = (delta.subsec_nanos() / 1000) as f64 / 1_000_000.0;
 
-            self.control.update(delta_sec);
+            self.control.update(delta_sec, self.mesh.shape());
             self.mesh.update(&self.facade, &self.control.camera());
 
             last_time = Instant::now();

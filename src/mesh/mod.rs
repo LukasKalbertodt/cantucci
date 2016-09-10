@@ -27,7 +27,7 @@ pub struct FractalMesh<Sh> {
     active_jobs: u64,
 }
 
-impl<Sh: Shape + 'static> FractalMesh<Sh> {
+impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
     pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
         use util::gl::load_program;
 
@@ -58,6 +58,10 @@ impl<Sh: Shape + 'static> FractalMesh<Sh> {
             mesh_tx: tx,
             active_jobs: 0,
         })
+    }
+
+    pub fn shape(&self) -> &Sh {
+        &self.shape
     }
 
     pub fn update<F: Facade>(&mut self, facade: &F, cam: &Camera) {

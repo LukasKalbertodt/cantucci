@@ -1,5 +1,6 @@
 use camera::{Camera, Projection};
 use core::math::*;
+use core::Shape;
 use event::{EventHandler, EventResponse};
 use glium::backend::glutin_backend::GlutinFacade;
 use glium::glutin::{CursorState, Event};
@@ -77,7 +78,7 @@ impl CamControl for Fly {
         &mut self.cam.projection
     }
 
-    fn update(&mut self, delta: f64) {
+    fn update(&mut self, delta: f64, shape: &Shape) {
         fn update_speed(speed: &mut f64, accel: f64, delta: f64) {
             *speed = lerp(
                 *speed,
@@ -96,9 +97,11 @@ impl CamControl for Fly {
             1.0
         };
 
+        let distance = shape.distance(self.cam.position);
+
         let up_vec = Vector3::new(0.0, 0.0, 1.0);
         let left_vec = -self.cam.direction().cross(up_vec).normalize();
-        self.cam.position += speed_multiplier * delta * (
+        self.cam.position += distance.min * speed_multiplier * delta * (
             self.cam.direction() * self.forward_speed +
             left_vec * self.left_speed +
             up_vec * self.up_speed

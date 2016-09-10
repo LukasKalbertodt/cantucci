@@ -1,8 +1,9 @@
-use glium::glutin::VirtualKeyCode;
 use camera::{Camera, Projection};
-use glium::glutin::Event;
-use event::{EventHandler, EventResponse};
 use core::math::*;
+use core::Shape;
+use event::{EventHandler, EventResponse};
+use glium::glutin::Event;
+use glium::glutin::VirtualKeyCode;
 
 mod fly;
 mod orbit;
@@ -23,7 +24,7 @@ pub trait CamControl: EventHandler {
 
     /// Is called regularly to update the internal camera. `delta` is the time
     /// in seconds since the last time this method was called.
-    fn update(&mut self, _delta: f64) {}
+    fn update(&mut self, _delta: f64, _shape: &Shape) {}
 
     /// Returns `self` as `EventHandler` trait object.
     fn as_event_handler(&mut self) -> &mut EventHandler;
@@ -130,7 +131,7 @@ impl<A: CamControl, B: CamControl> CamControl for KeySwitcher<A, B> {
         }
     }
 
-    fn update(&mut self, delta: f64) {
+    fn update(&mut self, delta: f64, shape: &Shape) {
         const TRANSITION_DURATION: f64 = 0.3;
 
         self.amount_first += (delta / TRANSITION_DURATION) * if self.first_active {
@@ -141,8 +142,8 @@ impl<A: CamControl, B: CamControl> CamControl for KeySwitcher<A, B> {
         self.amount_first = clamp(self.amount_first, 0.0, 1.0);
 
         match self.first_active {
-            true => self.first.update(delta),
-            false => self.second.update(delta),
+            true => self.first.update(delta, shape),
+            false => self.second.update(delta, shape),
         }
     }
 
