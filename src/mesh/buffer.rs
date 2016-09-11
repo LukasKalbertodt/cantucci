@@ -35,6 +35,8 @@ impl MeshBuffer {
 
         let mut raw_vbuf = Vec::with_capacity(resolution.pow(3) as usize);
 
+        // let mut points = Vec::new();
+
         for (x, y, z) in cube(resolution) {
             // Calculate the corresponding point in world space
             let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
@@ -42,16 +44,21 @@ impl MeshBuffer {
             let d = (span.end - span.start) / resolution as f64;
             let p = p0 + d / 2.0;
 
-            let partially_in =
-                grid[(x    , y    , z    )] < 0.0 ||
-                grid[(x    , y    , z + 1)] < 0.0 ||
-                grid[(x    , y + 1, z    )] < 0.0 ||
-                grid[(x    , y + 1, z + 1)] < 0.0 ||
-                grid[(x + 1, y    , z    )] < 0.0 ||
-                grid[(x + 1, y    , z + 1)] < 0.0 ||
-                grid[(x + 1, y + 1, z    )] < 0.0 ||
-                grid[(x + 1, y + 1, z + 1)] < 0.0;
+            let distances = [
+                grid[(x    , y    , z    )],
+                grid[(x    , y    , z + 1)],
+                grid[(x    , y + 1, z    )],
+                grid[(x    , y + 1, z + 1)],
+                grid[(x + 1, y    , z    )],
+                grid[(x + 1, y    , z + 1)],
+                grid[(x + 1, y + 1, z    )],
+                grid[(x + 1, y + 1, z + 1)],
+            ];
 
+            let partially_in = !(
+                distances.iter().all(|&d| d < 0.0) ||
+                distances.iter().all(|&d| d > 0.0)
+            );
 
             if partially_in {
                 // "nice" coloring

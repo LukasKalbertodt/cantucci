@@ -110,8 +110,8 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         }
 
         fn desired_resolution(p: Point3<f64>, eye: Point3<f64>) -> ResolutionQuery {
-            const PRECISION_MUTIPLIER: f64 = 70.0;
-            const MAX_RES: f64 = 100.0;
+            const PRECISION_MUTIPLIER: f64 = 130.0;
+            const MAX_RES: f64 = 200.0;
 
             let desired = 1.0/(p - eye).magnitude() * PRECISION_MUTIPLIER;
             let desired = clamp(desired, 0.0, MAX_RES);
