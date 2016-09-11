@@ -33,11 +33,11 @@ impl MeshBuffer {
             shape.distance(p).min
         });
 
-        let mut raw_vbuf = Vec::with_capacity(resolution.pow(3) as usize);
 
-        // let mut points = Vec::new();
+        let mut raw_vbuf = Vec::new();
 
-        for (x, y, z) in cube(resolution) {
+        // Iterate over all cells of the grid
+        let points = GridTable::fill_with(resolution, |x, y, z| {
             // Calculate the corresponding point in world space
             let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
             let p0 = span.start + (span.end - span.start).mul_element_wise(v);
@@ -61,17 +61,61 @@ impl MeshBuffer {
             );
 
             if partially_in {
-                // "nice" coloring
-                let m = (p.to_vec().magnitude() as f32).powf(8.0);
                 raw_vbuf.push(Vertex {
                     position: p.to_vec().cast::<f32>().to_arr(),
-                    color: [m; 3],
+                    color: [(p.to_vec().magnitude() as f32).powf(8.0); 3],
                 });
+                raw_vbuf.len() as u32 - 1
+            } else {
+                // This is a bit hacky, but we will never access this number
+                0
+            }
+        });
+
+        let mut raw_ibuf = Vec::new();
+
+        // Iterate over all edges by iterating over all points
+        for (x, y, z) in cube(resolution) {
+            // Edge from this point to point in +x direction
+            if y > 0 && z > 0 && grid[(x, y, z)].signum() != grid[(x + 1, y, z)].signum()  {
+                let v0 = points[(x, y - 1, z - 1)];
+                let v1 = points[(x, y - 1, z    )];
+                let v2 = points[(x, y    , z - 1)];
+                let v3 = points[(x, y    , z    )];
+
+                raw_ibuf.extend_from_slice(&[
+                    v0, v1, v2,
+                    v1, v2, v3,
+                ]);
+            }
+            // Edge from this point to point in +y direction
+            if x > 0 && z > 0 && grid[(x, y, z)].signum() != grid[(x, y + 1, z)].signum()  {
+                let v0 = points[(x - 1, y, z - 1)];
+                let v1 = points[(x - 1, y, z    )];
+                let v2 = points[(x,     y, z - 1)];
+                let v3 = points[(x,     y, z    )];
+
+                raw_ibuf.extend_from_slice(&[
+                    v0, v1, v2,
+                    v1, v2, v3,
+                ]);
+            }
+            // Edge from this point to point in +z direction
+            if x > 0 && y > 0 && grid[(x, y, z)].signum() != grid[(x, y, z + 1)].signum()  {
+                let v0 = points[(x - 1, y - 1, z)];
+                let v1 = points[(x - 1, y    , z)];
+                let v2 = points[(x,     y - 1, z)];
+                let v3 = points[(x,     y    , z)];
+
+                raw_ibuf.extend_from_slice(&[
+                    v0, v1, v2,
+                    v1, v2, v3,
+                ]);
             }
         }
 
         // Fill index buffer
-        let raw_ibuf = (0..raw_vbuf.len() as u32).collect();
+        // let raw_ibuf = (0..raw_vbuf.len() as u32).collect();
 
         debug!(
             "Generated {} points in box ({:?}) @ {} res",
@@ -104,7 +148,7 @@ impl MeshView {
 
         let ibuf = IndexBuffer::new(
             facade,
-            PrimitiveType::Points,
+            PrimitiveType::TrianglesList,
             &buf.raw_ibuf
         ).unwrap();
 
