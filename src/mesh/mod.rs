@@ -145,7 +145,8 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
 
                 // Generate the raw buffers on another thread
                 self.thread_pool.execute(move || {
-                    let buf = MeshBuffer::generate_for_box(&span, &shape, desired_res.desired);
+                    // let buf = MeshBuffer::generate_for_box(&span, &shape, desired_res.desired);
+                    let buf = MeshBuffer::generate_for_box(&span, &shape, 64);
                     let res = tx.send((span.center(), buf));
 
                     if res.is_err() {
