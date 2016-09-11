@@ -6,6 +6,7 @@ use glium::{VertexBuffer, IndexBuffer};
 use mesh::octree::Span;
 use std::ops::Index;
 use util::ToArr;
+use util::iter::cube;
 
 pub struct MeshBuffer {
     raw_vbuf: Vec<Vertex>,
@@ -25,31 +26,40 @@ impl MeshBuffer {
 
         debug!("Starting to generate in {:?} @ {} res", span, resolution);
 
-        let grid = GridTable::fill_with(resolution, |x, y, z| {
+        let grid = GridTable::fill_with(resolution + 1, |x, y, z| {
             let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
             let p = span.start + (span.end - span.start).mul_element_wise(v);
 
-            shape.contains(p)
+            shape.distance(p).min
         });
 
         let mut raw_vbuf = Vec::with_capacity(resolution.pow(3) as usize);
 
-        for x in 0..resolution {
-            for y in 0..resolution {
-                for z in 0..resolution {
-                    // Calculate the corresponding point in world space
-                    let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
-                    let p = span.start + (span.end - span.start).mul_element_wise(v);
+        for (x, y, z) in cube(resolution) {
+            // Calculate the corresponding point in world space
+            let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
+            let p0 = span.start + (span.end - span.start).mul_element_wise(v);
+            let d = (span.end - span.start) / resolution as f64;
+            let p = p0 + d / 2.0;
 
-                    // "nice" coloring
-                    let m = (p.to_vec().magnitude() as f32).powf(8.0);
-                    if shape.contains(p) {
-                        raw_vbuf.push(Vertex {
-                            position: p.to_vec().cast::<f32>().to_arr(),
-                            color: [m; 3],
-                        });
-                    }
-                }
+            let partially_in =
+                grid[(x    , y    , z    )] < 0.0 ||
+                grid[(x    , y    , z + 1)] < 0.0 ||
+                grid[(x    , y + 1, z    )] < 0.0 ||
+                grid[(x    , y + 1, z + 1)] < 0.0 ||
+                grid[(x + 1, y    , z    )] < 0.0 ||
+                grid[(x + 1, y    , z + 1)] < 0.0 ||
+                grid[(x + 1, y + 1, z    )] < 0.0 ||
+                grid[(x + 1, y + 1, z + 1)] < 0.0;
+
+
+            if partially_in {
+                // "nice" coloring
+                let m = (p.to_vec().magnitude() as f32).powf(8.0);
+                raw_vbuf.push(Vertex {
+                    position: p.to_vec().cast::<f32>().to_arr(),
+                    color: [m; 3],
+                });
             }
         }
 
@@ -140,31 +150,13 @@ impl<T> GridTable<T> {
     fn fill_with<F>(size: u32, mut filler: F) -> Self
         where F: FnMut(u32, u32, u32) -> T
     {
-        assert!(size.is_power_of_two());
         assert!(size >= 2);
 
-        fn fill<T, F: FnMut(u32, u32, u32) -> T>(
-            data: &mut Vec<T>,
-            size: u32, (ox, oy, oz): (u32, u32, u32),
-            mut filler: &mut F
-        ) {
-            if size == 1 {
-                data.push(filler(ox, oy, oz));
-            } else {
-                let half = size / 2;
-                fill(data, half, (ox       , oy       , oz       ), filler);
-                fill(data, half, (ox       , oy       , oz + half), filler);
-                fill(data, half, (ox       , oy + half, oz       ), filler);
-                fill(data, half, (ox       , oy + half, oz + half), filler);
-                fill(data, half, (ox + half, oy       , oz       ), filler);
-                fill(data, half, (ox + half, oy       , oz + half), filler);
-                fill(data, half, (ox + half, oy + half, oz       ), filler);
-                fill(data, half, (ox + half, oy + half, oz + half), filler);
-            }
-        }
-
         let mut data = Vec::with_capacity(size.pow(3) as usize);
-        fill(&mut data, size, (0, 0, 0), &mut filler);
+
+        for (x, y, z) in cube(size) {
+            data.push(filler(x, y, z));
+        }
 
         GridTable {
             size: size,
@@ -176,29 +168,12 @@ impl<T> GridTable<T> {
 impl<T> Index<(u32, u32, u32)> for GridTable<T> {
     type Output = T;
 
-    fn index(&self, (mut x, mut y, mut z): (u32, u32, u32)) -> &Self::Output {
+    fn index(&self, (x, y, z): (u32, u32, u32)) -> &Self::Output {
         assert!(x < self.size);
         assert!(y < self.size);
         assert!(z < self.size);
 
-        let mut size = self.size;
-        let mut idx = 0;
-
-        while size > 1 {
-            if x >= size / 2 {
-                idx += size.pow(3) / 2;
-                x -= size / 2;
-            }
-            if y >= size / 2 {
-                idx += size.pow(3) / 4;
-                y -= size / 2;
-            }
-            if z >= size / 2 {
-                idx += size.pow(3) / 8;
-                z -= size / 2;
-            }
-            size /= 2;
-        }
+        let idx = x * self.size.pow(2) + y * self.size + z;
 
         &self.data[idx as usize]
     }
