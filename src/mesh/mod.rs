@@ -36,6 +36,9 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
             Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0)
         );
         let _ = tree.root_mut().split();
+        for mut child in tree.root_mut().into_children().unwrap() {
+            child.split();
+        }
 
         // Prepare thread pool and channels to communicate
         let (tx, rx) = channel();
@@ -110,8 +113,8 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         }
 
         fn desired_resolution(p: Point3<f64>, eye: Point3<f64>) -> ResolutionQuery {
-            const PRECISION_MUTIPLIER: f64 = 130.0;
-            const MAX_RES: f64 = 200.0;
+            const PRECISION_MUTIPLIER: f64 = 150.0;
+            const MAX_RES: f64 = 250.0;
 
             let desired = 1.0/(p - eye).magnitude() * PRECISION_MUTIPLIER;
             let desired = clamp(desired, 0.0, MAX_RES);
@@ -124,7 +127,12 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         }
 
         // TODO: iterate over all leaves
-        for mut leaf in self.tree.root_mut().into_children().unwrap() {
+        let leaves = self.tree.root_mut()
+            .into_children()
+            .unwrap()
+            .into_iter()
+            .flat_map(|n| n.into_children().unwrap());
+        for mut leaf in leaves {
             let desired_res = desired_resolution(leaf.span().center(), cam.position);
 
             // Decide whether or not to generate a new buffer for this leaf
