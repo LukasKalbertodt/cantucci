@@ -24,6 +24,13 @@ impl MeshBuffer {
         assert!(span.start.y < span.end.y);
         assert!(span.start.z < span.end.z);
 
+        // adjust span to avoid empty transitions
+        let mut span = span.clone();
+        let overflow = (span.end - span.start) / resolution as f64;
+        span.start += -overflow;
+        span.end += overflow;
+        let span = span;
+
         debug!("Starting to generate in {:?} @ {} res", span, resolution);
 
         let grid = GridTable::fill_with(resolution + 1, |x, y, z| {
