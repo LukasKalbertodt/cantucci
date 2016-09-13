@@ -66,9 +66,8 @@ impl Shape for Mandelbulb {
         const BAILOUT: f64 = 2.5;
 
         for _ in 0..self.max_iters {
-
             r = z.to_vec().magnitude();
-            if r > BAILOUT {
+            if r > BAILOUT || (1.0 / r).is_infinite() {
                 break;
             }
 
@@ -91,7 +90,8 @@ impl Shape for Mandelbulb {
             z += p.to_vec();
         }
 
-        let lower = 0.5 * r.ln() * r / dr;
+        let ln_r = if r.ln().is_infinite() { 0.0 } else { r.ln() * r };
+        let lower = 0.5 * ln_r / dr;
 
         DistanceApprox {
             min: lower,

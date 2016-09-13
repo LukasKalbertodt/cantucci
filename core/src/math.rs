@@ -1,6 +1,7 @@
 extern crate cgmath;
 
 use std::ops::Sub;
+use std::fmt;
 
 pub use cgmath::prelude::*;
 pub use cgmath::{
@@ -14,9 +15,9 @@ pub use cgmath::{
 
 pub fn lerp<V, F>(a: V, b: V, t: F) -> V
     where V: Lerp<F>,
-          F: LerpFactor
+          F: LerpFactor + fmt::Debug
 {
-    assert!(t >= F::zero() && t <= F::one());
+    assert!(t >= F::zero() && t <= F::one(), "factor was {:?}", t);
     a.lerp(b, t)
 }
 

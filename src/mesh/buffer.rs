@@ -41,8 +41,18 @@ impl MeshBuffer {
             // Calculate the corresponding point in world space
             let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
             let p0 = span.start + (span.end - span.start).mul_element_wise(v);
-            let d = (span.end - span.start) / resolution as f64;
-            let p = p0 + d / 2.0;
+            let step = (span.end - span.start) / resolution as f64;
+
+            let corners = [
+                p0 + Vector3::new(   0.0,    0.0,    0.0),
+                p0 + Vector3::new(   0.0,    0.0, step.z),
+                p0 + Vector3::new(   0.0, step.y,    0.0),
+                p0 + Vector3::new(   0.0, step.y, step.z),
+                p0 + Vector3::new(step.x,    0.0,    0.0),
+                p0 + Vector3::new(step.x,    0.0, step.z),
+                p0 + Vector3::new(step.x, step.y,    0.0),
+                p0 + Vector3::new(step.x, step.y, step.z),
+            ];
 
             let distances = [
                 grid[(x    , y    , z    )],
@@ -61,9 +71,59 @@ impl MeshBuffer {
             );
 
             if partially_in {
+                let edge_ids = [
+                    // in +x direciton
+                    (0, 4),
+                    (1, 5),
+                    (2, 6),
+                    (3, 7),
+
+                    // in +y direction
+                    (0, 2),
+                    (1, 3),
+                    (4, 6),
+                    (5, 7),
+
+                    // in +z direction
+                    (0, 1),
+                    (2, 3),
+                    (4, 5),
+                    (6, 7),
+                ];
+
+                let points: Vec<_> = edge_ids.iter()
+                    // we are only interested in the edges with shape crossing
+                    .filter(|&&(from, to)| {
+                        distances[from].signum() != distances[to].signum()
+                    })
+                    // weight middle point with distances
+                    .map(|&(from, to)| {
+                        let mut d_from = distances[from];
+                        let mut d_to = distances[to];
+
+                        if d_from > 0.0 {
+                            d_from = -d_from;
+                            d_to = -d_to;
+                        }
+
+                        let weight_from = if d_to == d_from {
+                            0.5
+                        } else {
+                            let d_diff = d_to - d_from;
+                            clamp(-d_from / d_diff, 0.0, 1.0)
+                        };
+                        lerp(corners[from], corners[to], weight_from)
+                    })
+                    .collect();
+                let p = Point3::centroid(&points);
+
+                let dist_p = shape.distance(p);
+                let color = (p.to_vec().magnitude() * 0.85).powf(8.0);
+                // let color = color * clamp(dist_p.min * 1000.0, 0.0, 1.0);
+
                 raw_vbuf.push(Vertex {
                     position: p.to_vec().cast::<f32>().to_arr(),
-                    color: [(p.to_vec().magnitude() as f32).powf(8.0); 3],
+                    color: [color as f32; 3],
                 });
                 raw_vbuf.len() as u32 - 1
             } else {
@@ -114,12 +174,9 @@ impl MeshBuffer {
             }
         }
 
-        // Fill index buffer
-        // let raw_ibuf = (0..raw_vbuf.len() as u32).collect();
-
         debug!(
             "Generated {} points in box ({:?}) @ {} res",
-            raw_vbuf.len(),
+            raw_ibuf.len() / 3,
             span,
             resolution,
         );

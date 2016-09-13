@@ -22,7 +22,7 @@ impl Shape for Sphere {
     }
 
     fn distance(&self, p: Point3<f64>) -> DistanceApprox {
-        let d = ((self.center - p).magnitude() - self.radius).abs() ;
+        let d = (self.center - p).magnitude() - self.radius;
         DistanceApprox {
             min: d,
             max: d,

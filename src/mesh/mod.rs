@@ -120,9 +120,12 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
             let desired = clamp(desired, 0.0, MAX_RES);
 
             ResolutionQuery {
-                min: (desired / 2.0) as u32,
-                desired: desired as u32,
-                max: (desired * 4.0) as u32,
+                // min: (desired / 2.0) as u32,
+                // desired: desired as u32,
+                // max: (desired * 4.0) as u32,
+                min: 0,
+                desired: 64,
+                max: 1_000_000,
             }
         }
 
@@ -180,6 +183,8 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
     }
 
     pub fn draw<S: Surface>(&mut self, surface: &mut S, camera: &Camera) {
+        use glium::draw_parameters::PolygonMode;
+
         let uniforms = uniform! {
             view_matrix: camera.view_transform().to_arr(),
             proj_matrix: camera.proj_transform().to_arr(),
@@ -192,6 +197,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
                 test: DepthTest::IfLess,
                 .. Default::default()
             },
+            // polygon_mode: PolygonMode::Line,
             // backface_culling: ::glium::draw_parameters::BackfaceCullingMode::CullingDisabled,
             .. DrawParameters::default()
         };
