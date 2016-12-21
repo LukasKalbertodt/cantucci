@@ -48,7 +48,7 @@ impl Shape for Mandelbulb {
             z = zr * Point3::new(
                 theta.sin() * phi.cos(),
                 phi.sin() * theta.sin(),
-                theta.cos()
+                theta.cos(),
             );
             z += p.to_vec();
         }
@@ -85,7 +85,7 @@ impl Shape for Mandelbulb {
             z = zr * Point3::new(
                 theta.sin() * phi.cos(),
                 phi.sin() * theta.sin(),
-                theta.cos()
+                theta.cos(),
             );
             z += p.to_vec();
         }

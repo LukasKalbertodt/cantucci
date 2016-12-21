@@ -3,15 +3,15 @@ uniform dmat4 view_matrix;
 uniform dmat4 proj_matrix;
 
 out float z;
-out vec3 ocolor;
+out float dist;
 out vec3 world_pos;
 
 in vec3 position;
-in vec3 color;
+in float distance_from_surface;
 
 void main() {
     z = position.z;
-    ocolor = color;
+    dist = distance_from_surface;
     world_pos = position;
 
     gl_Position = vec4(

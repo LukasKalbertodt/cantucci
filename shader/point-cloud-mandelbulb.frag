@@ -1,13 +1,15 @@
 #version 140
 
-in vec3 ocolor;
+in float dist;
 in float z;
 in vec3 world_pos;
 
 out vec4 color;
 
-void main() {
-    float c = abs(1.0 - length(world_pos)) * 1000;
+float col() {
+    return pow(length(world_pos) * 0.85, 8.0) * 0.7;
+}
 
-    color = vec4(ocolor, 1.0);
+void main() {
+    color = vec4(vec3(col()), 1.0);
 }

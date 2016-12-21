@@ -17,6 +17,7 @@ impl Sphere {
 }
 
 impl Shape for Sphere {
+    // Overwrite default method for performance
     fn contains(&self, p: Point3<f64>) -> bool {
         (self.center - p).magnitude2() <= (self.radius * self.radius)
     }

@@ -31,7 +31,7 @@ impl MeshBuffer {
         span.end += overflow;
         let span = span;
 
-        debug!("Starting to generate in {:?} @ {} res", span, resolution);
+        trace!("Starting to generate in {:?} @ {} res", span, resolution);
 
         let grid = GridTable::fill_with(resolution + 1, |x, y, z| {
             let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
@@ -125,12 +125,12 @@ impl MeshBuffer {
                 let p = Point3::centroid(&points);
 
                 let dist_p = shape.distance(p);
-                let color = (p.to_vec().magnitude() * 0.85).powf(8.0);
-                // let color = color * clamp(dist_p.min * 1000.0, 0.0, 1.0);
+                // let color = (p.to_vec().magnitude() * 0.85).powf(8.0);
+                // let color = 0.5 * color + 0.5 * color * clamp(dist_p.min * 1000.0, 0.0, 1.0);
 
                 raw_vbuf.push(Vertex {
                     position: p.to_vec().cast::<f32>().to_arr(),
-                    color: [color as f32; 3],
+                    distance_from_surface: dist_p.min as f32,
                 });
                 raw_vbuf.len() as u32 - 1
             } else {
@@ -181,7 +181,7 @@ impl MeshBuffer {
             }
         }
 
-        debug!(
+        trace!(
             "Generated {} points in box ({:?}) @ {} res",
             raw_ibuf.len() / 3,
             span,
@@ -240,10 +240,10 @@ impl MeshView {
 #[derive(Copy, Clone)]
 pub struct Vertex {
     position: [f32; 3],
-    color: [f32; 3],
+    distance_from_surface: f32,
 }
 
-implement_vertex!(Vertex, position, color);
+implement_vertex!(Vertex, position, distance_from_surface);
 
 /// A lookup table for regular 3D grids. Every cell in the grid contains one
 /// value.
@@ -267,7 +267,7 @@ impl<T> GridTable<T> {
     {
         assert!(size >= 2);
 
-        let mut data = Vec::with_capacity(size.pow(3) as usize);
+        let mut data = Vec::with_capacity((size as usize).pow(3));
 
         for (x, y, z) in cube(size) {
             data.push(filler(x, y, z));
@@ -288,8 +288,11 @@ impl<T> Index<(u32, u32, u32)> for GridTable<T> {
         assert!(y < self.size);
         assert!(z < self.size);
 
-        let idx = x * self.size.pow(2) + y * self.size + z;
+        let idx =
+            (x as usize) * (self.size as usize).pow(2)
+            + (y as usize * self.size as usize)
+            + z as usize;
 
-        &self.data[idx as usize]
+        &self.data[idx]
     }
 }
