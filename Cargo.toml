@@ -6,6 +6,8 @@ authors = [
     "Julian Kniephoff <me@juliankniephoff.com>",
 ]
 
+[workspace]
+
 [dependencies]
 core = { path = "core/" }
 arrayvec = "0.3"
