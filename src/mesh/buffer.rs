@@ -26,7 +26,7 @@ impl MeshBuffer {
 
         // adjust span to avoid empty transitions
         let mut span = span.clone();
-        let overflow = (span.end - span.start) / resolution as f64;
+        let overflow = (span.end - span.start) / resolution as f32;
         span.start += -overflow;
         span.end += overflow;
         let span = span;
@@ -34,7 +34,7 @@ impl MeshBuffer {
         trace!("Starting to generate in {:?} @ {} res", span, resolution);
 
         let grid = GridTable::fill_with(resolution + 1, |x, y, z| {
-            let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
+            let v = Vector3::new(x, y, z).cast::<f32>() / (resolution as f32);
             let p = span.start + (span.end - span.start).mul_element_wise(v);
 
             shape.distance(p).min
@@ -46,9 +46,9 @@ impl MeshBuffer {
         // Iterate over all cells of the grid
         let points = GridTable::fill_with(resolution, |x, y, z| {
             // Calculate the corresponding point in world space
-            let v = Vector3::new(x, y, z).cast::<f64>() / (resolution as f64);
+            let v = Vector3::new(x, y, z).cast::<f32>() / (resolution as f32);
             let p0 = span.start + (span.end - span.start).mul_element_wise(v);
-            let step = (span.end - span.start) / resolution as f64;
+            let step = (span.end - span.start) / resolution as f32;
 
             let corners = [
                 p0 + Vector3::new(   0.0,    0.0,    0.0),

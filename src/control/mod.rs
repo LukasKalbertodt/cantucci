@@ -24,7 +24,7 @@ pub trait CamControl: EventHandler {
 
     /// Is called regularly to update the internal camera. `delta` is the time
     /// in seconds since the last time this method was called.
-    fn update(&mut self, _delta: f64, _shape: &Shape) {}
+    fn update(&mut self, _delta: f32, _shape: &Shape) {}
 
     /// Returns `self` as `EventHandler` trait object.
     fn as_event_handler(&mut self) -> &mut EventHandler;
@@ -52,7 +52,7 @@ pub struct KeySwitcher<A, B> {
 
     /// How much the first camera influences the final camera (between 1.0
     /// and 0.0).
-    amount_first: f64,
+    amount_first: f32,
 }
 
 impl<A: CamControl, B: CamControl> KeySwitcher<A, B> {
@@ -131,8 +131,8 @@ impl<A: CamControl, B: CamControl> CamControl for KeySwitcher<A, B> {
         }
     }
 
-    fn update(&mut self, delta: f64, shape: &Shape) {
-        const TRANSITION_DURATION: f64 = 0.3;
+    fn update(&mut self, delta: f32, shape: &Shape) {
+        const TRANSITION_DURATION: f32 = 0.3;
 
         self.amount_first += (delta / TRANSITION_DURATION) * if self.first_active {
             1.0

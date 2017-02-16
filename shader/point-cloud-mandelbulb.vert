@@ -1,6 +1,6 @@
 #version 400
-uniform dmat4 view_matrix;
-uniform dmat4 proj_matrix;
+uniform mat4 view_matrix;
+uniform mat4 proj_matrix;
 
 out float z;
 out float dist;

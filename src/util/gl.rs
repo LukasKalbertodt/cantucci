@@ -16,14 +16,14 @@ pub fn load_program<F, S>(facade: &F, src: S) -> Result<Program>
     debug!("Loading vertex shader '{}' ...", vert_path);
 
     let mut vert_buf = String::new();
-    try!(File::open(vert_path).and_then(|mut f| f.read_to_string(&mut vert_buf)));
+    File::open(vert_path).and_then(|mut f| f.read_to_string(&mut vert_buf))?;
 
     // Load fragment shader
     let frag_path = format!("{}/{}.frag", SHADER_FOLDER, src.frag_path());
     debug!("Loading fragment shader '{}' ...", frag_path);
 
     let mut frag_buf = String::new();
-    try!(File::open(frag_path).and_then(|mut f| f.read_to_string(&mut frag_buf)));
+    File::open(frag_path).and_then(|mut f| f.read_to_string(&mut frag_buf))?;
 
 
     // Link program

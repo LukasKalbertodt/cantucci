@@ -7,43 +7,43 @@ use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which theta can change.
 /// Phi can change twice as fast, because the range is twice as big.
-const MAX_TURN_SPEED: Rad<f64> = Rad(1.0);
+const MAX_TURN_SPEED: Rad<f32> = Rad(1.0);
 
 /// This describes how slowly the maximum speed is reached. Precisely, it's
 /// the time (in seconds) it takes to accelerate from speed 'x' to speed
 /// '(MAX_TURN_SPEED + x) / 2'.
-const TURN_DELAY: f64 = 0.05;
+const TURN_DELAY: f32 = 0.05;
 
 /// Describes how quickly the user can zoom in and out. Precisely,
 /// '2.pow(ZOOM_SPEED)' describes the factor by which the distance can grow
 /// or shrink each second. When ZOOM_SPEED=1.0 (default), then the distance
 /// doubles or shrinks every second when zooming.
-const ZOOM_SPEED: f64 = 1.0;
+const ZOOM_SPEED: f32 = 1.0;
 
 /// Offers orbital control around a fixed origin point.
 pub struct Orbit {
-    origin: Point3<f64>,
-    distance: f64,  // TODO: this can be calculated from the camera as well ...
+    origin: Point3<f32>,
+    distance: f32,  // TODO: this can be calculated from the camera as well ...
     cam: Camera,
 
     // These four values are used for smooth rotations. The `speed` values
     // hold the current speed (in rad/s) by which the spherical coordinates
     // change the next frame. The `accel` values are either 1, 0 or -1 and
     // described the acceleration by which the speed changes.
-    theta_speed: Rad<f64>,
-    theta_accel: Rad<f64>,
-    phi_speed: Rad<f64>,
-    phi_accel: Rad<f64>,
+    theta_speed: Rad<f32>,
+    theta_accel: Rad<f32>,
+    phi_speed: Rad<f32>,
+    phi_accel: Rad<f32>,
 
     // This is either `ZOOM_SPEED`, 0 or `-ZOOM_SPEED`. See its documentation
     // for more information.
-    zoom_speed: f64,
+    zoom_speed: f32,
 }
 
 impl Orbit {
     /// Creates an orbital control around the given point with the given
     /// projection.
-    pub fn around(origin: Point3<f64>, proj: Projection) -> Self {
+    pub fn around(origin: Point3<f32>, proj: Projection) -> Self {
         let init_dir = Vector3::new(1.0, 0.0, 0.0).normalize();
         let distance = 3.0;
 
@@ -59,7 +59,7 @@ impl Orbit {
         }
     }
 
-    fn update_distance(&mut self, distance: f64) {
+    fn update_distance(&mut self, distance: f32) {
         self.distance = distance;
         self.cam.position = self.origin + self.distance * -self.cam.direction();
     }
@@ -74,17 +74,17 @@ impl CamControl for Orbit {
         &mut self.cam.projection
     }
 
-    fn update(&mut self, delta: f64, _: &Shape) {
+    fn update(&mut self, delta: f32, _: &Shape) {
         // Update the theta and phi turning speeds
         self.theta_speed = lerp(
             self.theta_speed,
             self.theta_accel * MAX_TURN_SPEED.0,
-            (1.0 - 2.0f64.powf(-delta / TURN_DELAY)),
+            (1.0 - 2.0f32.powf(-delta / TURN_DELAY)),
         );
         self.phi_speed = lerp(
             self.phi_speed,
             self.phi_accel * MAX_TURN_SPEED.0 * 2.0,
-            (1.0 - 2.0f64.powf(-delta / TURN_DELAY)),
+            (1.0 - 2.0f32.powf(-delta / TURN_DELAY)),
         );
 
         // Update actual turning position with those calculates speeds and
@@ -98,7 +98,7 @@ impl CamControl for Orbit {
 
         // Update distance from origin
         let rate_of_change = self.zoom_speed * delta;
-        let new_distance = self.distance * 2.0f64.powf(rate_of_change);
+        let new_distance = self.distance * 2.0f32.powf(rate_of_change);
         self.update_distance(new_distance);
     }
 

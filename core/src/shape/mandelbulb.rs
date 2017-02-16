@@ -3,12 +3,12 @@ use super::{DistanceApprox, Shape};
 
 #[derive(Clone)]
 pub struct Mandelbulb {
-    power: f64,
+    power: f32,
     max_iters: u64,
 }
 
 impl Mandelbulb {
-    pub fn new(power: f64, max_iters: u64) -> Self {
+    pub fn new(power: f32, max_iters: u64) -> Self {
         Mandelbulb {
             power: power,
             max_iters: max_iters,
@@ -21,8 +21,8 @@ impl Mandelbulb {
 }
 
 impl Shape for Mandelbulb {
-    fn contains(&self, p: Point3<f64>) -> bool {
-        const BAILOUT: f64 = 2.5;
+    fn contains(&self, p: Point3<f32>) -> bool {
+        const BAILOUT: f32 = 2.5;
 
         let mut z = p;
 
@@ -37,7 +37,7 @@ impl Shape for Mandelbulb {
 
             // Convert to spherical coordinates
             let theta = (z.z / r).acos();
-            let phi = f64::atan2(z.y, z.x);
+            let phi = f32::atan2(z.y, z.x);
 
             // Scale and rotate the point
             let zr = r.powf(self.power);
@@ -58,12 +58,12 @@ impl Shape for Mandelbulb {
         true
     }
 
-    fn distance(&self, p: Point3<f64>) -> DistanceApprox {
+    fn distance(&self, p: Point3<f32>) -> DistanceApprox {
         let mut z = p;
         let mut dr = 1.0;
         let mut r = 0.0;
 
-        const BAILOUT: f64 = 2.5;
+        const BAILOUT: f32 = 2.5;
 
         for _ in 0..self.max_iters {
             r = z.to_vec().magnitude();
@@ -73,7 +73,7 @@ impl Shape for Mandelbulb {
 
             // convert to polar coordinates
             let theta = (z.z / r).acos();
-            let phi = f64::atan2(z.y, z.x);
+            let phi = f32::atan2(z.y, z.x);
             dr = r.powf(self.power - 1.0) * self.power * dr + 1.0;
 
             // scale and rotate the point

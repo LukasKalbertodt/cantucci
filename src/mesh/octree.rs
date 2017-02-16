@@ -3,19 +3,19 @@ use core::math::*;
 use arrayvec::ArrayVec;
 
 /// A box in three dimensional space that is represented by one octree node
-pub type Span = Range<Point3<f64>>;
+pub type Span = Range<Point3<f32>>;
 
 pub trait SpanExt {
-    fn center(&self) -> Point3<f64>;
-    fn contains(&self, p: Point3<f64>) -> bool;
+    fn center(&self) -> Point3<f32>;
+    fn contains(&self, p: Point3<f32>) -> bool;
 }
 
 impl SpanExt for Span {
-    fn center(&self) -> Point3<f64> {
+    fn center(&self) -> Point3<f32> {
         self.start + (self.end - self.start) / 2.0
     }
 
-    fn contains(&self, p: Point3<f64>) -> bool {
+    fn contains(&self, p: Point3<f32>) -> bool {
         let s = self.start;
         let e = self.end;
 
@@ -30,7 +30,7 @@ impl SpanExt for Span {
 /// In this application it's used to save the representation of the octant in
 /// order to allow different resolutions in different parts of space.
 pub struct Octree<T> {
-    span: Range<Point3<f64>>,
+    span: Range<Point3<f32>>,
     root: Octnode<T>,
 }
 
@@ -66,7 +66,7 @@ impl<T> Octree<T> {
 
     // }
 
-    pub fn leaf_mut_around(&mut self, p: Point3<f64>) -> NodeEntryMut<T> {
+    pub fn leaf_mut_around(&mut self, p: Point3<f32>) -> NodeEntryMut<T> {
         let mut node = self.root_mut();
         loop {
             if node.is_leaf() {
@@ -129,7 +129,7 @@ enum Octnode<T> {
 
 // ===========================================================================
 
-const SPLIT_SPAN_DIFF_AMOUNT: &'static [Vector3<f64>; 8] = &[
+const SPLIT_SPAN_DIFF_AMOUNT: &'static [Vector3<f32>; 8] = &[
     Vector3 { x: 0.0, y: 0.0, z: 0.0 },
     Vector3 { x: 0.0, y: 0.0, z: 1.0 },
     Vector3 { x: 0.0, y: 1.0, z: 0.0 },

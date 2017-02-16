@@ -8,8 +8,8 @@ pub use self::mandelbulb::Mandelbulb;
 
 #[derive(Clone, Copy, Debug)]
 pub struct DistanceApprox {
-    pub min: f64,
-    pub max: f64,
+    pub min: f32,
+    pub max: f32,
 }
 
 pub trait Shape: Send {
@@ -18,8 +18,8 @@ pub trait Shape: Send {
     ///
     /// If `p` is inside the shape, the returned distance has to be negative.
     /// Either both or none of `min` and `max` have to be negative.
-    fn distance(&self, p: Point3<f64>) -> DistanceApprox;
+    fn distance(&self, p: Point3<f32>) -> DistanceApprox;
 
     /// Returns true iff the given point lies in the shape.
-    fn contains(&self, p: Point3<f64>) -> bool;
+    fn contains(&self, p: Point3<f32>) -> bool;
 }

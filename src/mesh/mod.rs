@@ -22,8 +22,8 @@ pub struct FractalMesh<Sh> {
     program: Program,
     shape: Sh,
     thread_pool: ThreadPool,
-    new_meshes: Receiver<(Point3<f64>, MeshBuffer)>,
-    mesh_tx: Sender<(Point3<f64>, MeshBuffer)>,
+    new_meshes: Receiver<(Point3<f32>, MeshBuffer)>,
+    mesh_tx: Sender<(Point3<f32>, MeshBuffer)>,
     active_jobs: u64,
 }
 
@@ -47,10 +47,8 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         info!("Using {} threads to generate fractal", num_threads);
 
         // Load Shader program
-        let prog = try!(
-            load_program(facade, "point-cloud-mandelbulb")
-                .chain_err(|| "loading program for fractal mesh failed")
-        );
+        let prog = load_program(facade, "point-cloud-mandelbulb")
+            .chain_err(|| "loading program for fractal mesh failed")?;
 
         Ok(FractalMesh {
             tree: tree,
@@ -112,9 +110,9 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
             max: u32,
         }
 
-        fn desired_resolution(p: Point3<f64>, eye: Point3<f64>) -> ResolutionQuery {
-            const PRECISION_MUTIPLIER: f64 = 150.0;
-            const MAX_RES: f64 = 250.0;
+        fn desired_resolution(p: Point3<f32>, eye: Point3<f32>) -> ResolutionQuery {
+            const PRECISION_MUTIPLIER: f32 = 150.0;
+            const MAX_RES: f32 = 250.0;
 
             let desired = 1.0/(p - eye).magnitude() * PRECISION_MUTIPLIER;
             let desired = clamp(desired, 0.0, MAX_RES);
