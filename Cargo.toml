@@ -11,11 +11,11 @@ authors = [
 [dependencies]
 core = { path = "core/" }
 arrayvec = "0.3"
-cgmath = "0.11.0"
-env_logger = "0.3"
+cgmath = "0.12.0"
+env_logger = "0.4.0"
 error-chain = "0.4"
 glium = "0.15"
-log = "0.3"
+log = "0.3.6"
 num_cpus = "1"
 term-painter = "0.2"
 threadpool = "1"
