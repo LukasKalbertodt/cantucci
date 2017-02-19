@@ -19,6 +19,7 @@ mod control;
 mod errors;
 mod event;
 mod mesh;
+mod sky;
 mod util;
 
 

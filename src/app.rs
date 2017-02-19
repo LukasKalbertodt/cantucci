@@ -8,6 +8,7 @@ use errors::*;
 use event::{EventResponse, poll_events_with, QuitHandler};
 use glium::backend::glutin_backend::GlutinFacade;
 use mesh::FractalMesh;
+use sky::Sky;
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
@@ -15,6 +16,7 @@ pub struct App {
     facade: GlutinFacade,
     control: Box<CamControl>,
     mesh: FractalMesh<Mandelbulb>,
+    sky: Sky,
     // mesh: FractalMesh<Sphere>,
     print_fps: bool,
 }
@@ -42,10 +44,13 @@ impl App {
         let fly = FlyControl::new(orbit.camera().clone(), &facade);
         let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
 
+        let sky = Sky::new(&facade)?;
+
         Ok(App {
             facade: facade,
             control: Box::new(switcher),
             mesh: mesh,
+            sky: sky,
             print_fps: false,
         })
     }
@@ -79,6 +84,7 @@ impl App {
             let mut target = self.facade.draw();
             target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
+            self.sky.draw(&mut target, &self.control.camera())?;
             self.mesh.draw(&mut target, &self.control.camera());
 
             target.finish().unwrap();

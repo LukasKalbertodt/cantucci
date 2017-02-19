@@ -8,5 +8,8 @@ error_chain! {
         // glium stuff
         glium::GliumCreationError<glium::glutin::CreationError>, GliumCreation;
         glium::ProgramCreationError, GliumProgramCreation;
+        glium::vertex::BufferCreationError, VertexBufferCreation;
+        glium::index::BufferCreationError, IndexBufferCreation;
+        glium::DrawError, DrawError;
     }
 }
