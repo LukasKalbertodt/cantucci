@@ -15,8 +15,8 @@ void main() {
     world_pos = position;
 
     gl_Position = vec4(
-        proj_matrix *
-        view_matrix *
-        vec4(position, 1.0)
+        proj_matrix
+            * view_matrix
+            * vec4(position, 1.0)
     );
 }

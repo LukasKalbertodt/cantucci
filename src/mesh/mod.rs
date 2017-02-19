@@ -47,7 +47,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         info!("Using {} threads to generate fractal", num_threads);
 
         // Load Shader program
-        let prog = load_program(facade, "point-cloud-mandelbulb")
+        let prog = load_program(facade, "iso-surface")
             .chain_err(|| "loading program for fractal mesh failed")?;
 
         Ok(FractalMesh {
