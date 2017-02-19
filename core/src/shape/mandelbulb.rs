@@ -5,25 +5,25 @@ use super::{DistanceApprox, Shape};
 pub struct Mandelbulb {
     power: f32,
     max_iters: u64,
+    bailout: f32,
 }
 
 impl Mandelbulb {
-    pub fn new(power: f32, max_iters: u64) -> Self {
+    pub fn new(power: f32, max_iters: u64, bailout: f32) -> Self {
         Mandelbulb {
             power: power,
             max_iters: max_iters,
+            bailout: bailout,
         }
     }
 
-    pub fn classic(max_iters: u64) -> Self {
-        Self::new(8.0, max_iters)
+    pub fn classic(max_iters: u64, bailout: f32) -> Self {
+        Self::new(8.0, max_iters, bailout)
     }
 }
 
 impl Shape for Mandelbulb {
     fn contains(&self, p: Point3<f32>) -> bool {
-        const BAILOUT: f32 = 2.5;
-
         let mut z = p;
 
         for _ in 0..self.max_iters {
@@ -31,7 +31,7 @@ impl Shape for Mandelbulb {
             let r = z.to_vec().magnitude();
 
             // If the radius is bigger than BAILOUT, this point will diverge
-            if r > BAILOUT {
+            if r > self.bailout {
                 return false;
             }
 

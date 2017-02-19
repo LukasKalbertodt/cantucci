@@ -28,7 +28,7 @@ impl App {
         let facade = create_context()
             .chain_err(|| "failed to create GL context")?;
 
-        let shape = Mandelbulb::classic(20);
+        let shape = Mandelbulb::classic(5, 2.5);
         // let shape = Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0);
         let mesh = FractalMesh::new(&facade, shape)?;
 
