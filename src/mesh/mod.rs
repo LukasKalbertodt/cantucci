@@ -182,9 +182,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         }
     }
 
-    pub fn draw<S: Surface>(&mut self, surface: &mut S, camera: &Camera) {
-        use glium::draw_parameters::PolygonMode;
-
+    pub fn draw<S: Surface>(&self, surface: &mut S, camera: &Camera) {
         let uniforms = uniform! {
             view_matrix: camera.view_transform().to_arr(),
             proj_matrix: camera.proj_transform().to_arr(),
