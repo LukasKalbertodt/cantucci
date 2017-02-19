@@ -1,4 +1,4 @@
-    use math::*;
+use math::*;
 
 mod sphere;
 mod mandelbulb;
