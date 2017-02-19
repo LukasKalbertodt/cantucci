@@ -25,13 +25,12 @@ impl App {
         use glium::glutin::VirtualKeyCode;
 
         // Create OpenGL context
-        let facade = try!(
-            create_context().chain_err(|| "failed to create GL context")
-        );
+        let facade = create_context()
+            .chain_err(|| "failed to create GL context")?;
 
-        let shape = Mandelbulb::classic(20);
+        let shape = Mandelbulb::classic(5, 2.5);
         // let shape = Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0);
-        let mesh = try!(FractalMesh::new(&facade, shape));
+        let mesh = FractalMesh::new(&facade, shape)?;
 
         let proj = Projection::new(
             Rad(1.0),
@@ -57,6 +56,7 @@ impl App {
         use std::time::{Duration, Instant};
         use std::io::{self, Write};
 
+        // Code for printing FPS and frame time
         const PRINT_FPS_EVERY_MS: u64 = 200;
         let mut next_fps_print_in = Duration::from_millis(PRINT_FPS_EVERY_MS);
         let mut frame_count = 0;
@@ -68,7 +68,7 @@ impl App {
 
             // Approximate time since last iteration and update all components
             let delta = Instant::now() - last_time;
-            let delta_sec = (delta.subsec_nanos() / 1000) as f64 / 1_000_000.0;
+            let delta_sec = (delta.subsec_nanos() / 1000) as f32 / 1_000_000.0;
 
             self.control.update(delta_sec, self.mesh.shape());
             self.mesh.update(&self.facade, &self.control.camera());
@@ -99,9 +99,9 @@ impl App {
                 if delta >= next_fps_print_in {
                     let over_time = delta - next_fps_print_in;
                     let since_last = over_time + Duration::from_millis(PRINT_FPS_EVERY_MS);
-                    let since_last = (since_last.subsec_nanos() / 1000) as f64 / 1000.0;
+                    let since_last = (since_last.subsec_nanos() / 1000) as f32 / 1000.0;
 
-                    let avg_delta = since_last / (frame_count as f64);
+                    let avg_delta = since_last / (frame_count as f32);
 
                     print!("\rδ {:.3}ms ({:.3} FPS)", avg_delta, 1000.0 / avg_delta);
                     io::stdout().flush().expect("flushing stdout failed...");
@@ -124,7 +124,7 @@ impl App {
         let mut new_res = None;
         let print_fps = &mut self.print_fps;
 
-        let out = poll_events_with(&self.facade, vec![
+        let out = poll_events_with(&self.facade, &mut [
             self.control.as_event_handler(),
             &mut QuitHandler,
             &mut |e: &Event| {
@@ -176,9 +176,7 @@ fn create_context() -> Result<GlutinFacade> {
         .with_dimensions(monitor_width / 2, monitor_height / 2)
         .with_title(WINDOW_TITLE)
         .with_gl(GlRequest::Latest)
-        .build_glium();
-
-    let context = try!(context);
+        .build_glium()?;
 
     // Print some information about the acquired OpenGL context
     info!("OpenGL context was successfully built");

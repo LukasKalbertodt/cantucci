@@ -11,15 +11,15 @@ pub use shape::Shape;
 // use std::time::Instant;
 
 
-pub fn get_circle(width: usize, height: usize, _angle: f64) -> PixelImage {
+pub fn get_circle(width: usize, height: usize, _angle: f32) -> PixelImage {
 
     let out = PixelImage::from_pixels(width, height, |_, _| {
 
         Color::white()
 
-    //     const WINDOW: f64 = 3.0;
-    //     let origin_x = (x as f64) / (width as f64 / WINDOW) - (WINDOW / 2.0);
-    //     let origin_z = (y as f64) / (height as f64 / WINDOW) - (WINDOW / 2.0);
+    //     const WINDOW: f32 = 3.0;
+    //     let origin_x = (x as f32) / (width as f32 / WINDOW) - (WINDOW / 2.0);
+    //     let origin_z = (y as f32) / (height as f32 / WINDOW) - (WINDOW / 2.0);
     //     // let origin = Point3::new(origin_x, -2.0, origin_z - 1.0);
     //     // let dir = Vector3::new(0.0, 1.0, 0.2);
 
@@ -36,8 +36,8 @@ pub fn get_circle(width: usize, height: usize, _angle: f64) -> PixelImage {
     //         let mut r = 0.0;
 
     //         const MAX_ITERS: u32 = 10;
-    //         const BAILOUT: f64 = 2.5;
-    //         const POWER: f64 = 8.0;
+    //         const BAILOUT: f32 = 2.5;
+    //         const POWER: f32 = 8.0;
 
     //         for i in 0..MAX_ITERS {
 
@@ -48,8 +48,8 @@ pub fn get_circle(width: usize, height: usize, _angle: f64) -> PixelImage {
 
     //             // convert to polar coordinates
     //             let theta = (z.z / r).acos();
-    //             // let theta = f64::atan2((z.x * z.x + z.y * z.y).sqrt(), z.z);
-    //             let phi = f64::atan2(z.y, z.x);
+    //             // let theta = f32::atan2((z.x * z.x + z.y * z.y).sqrt(), z.z);
+    //             let phi = f32::atan2(z.y, z.x);
     //             dr = r.powf(POWER - 1.0) * POWER * dr + 1.0;
 
     //             // scale and rotate the point
@@ -107,8 +107,8 @@ pub fn get_circle(width: usize, height: usize, _angle: f64) -> PixelImage {
 // fn march_ray<E>(origin: Point3f, dir: Vector3f, mut de: E) -> Option<SurfacePoint>
 //     where E: FnMut(Point3f) -> DefaultFloat
 // {
-//     const DISTANCE_THRESHOLD: f64 = 0.001;
-//     const BAILOUT: f64 = 2.5;
+//     const DISTANCE_THRESHOLD: f32 = 0.001;
+//     const BAILOUT: f32 = 2.5;
 //     let dir = dir.normalize();
 
 //     let mut iter = 0;

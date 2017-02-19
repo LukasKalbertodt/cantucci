@@ -22,8 +22,8 @@ pub fn lerp<V, F>(a: V, b: V, t: F) -> V
 }
 
 pub trait LerpFactor: Zero + One + PartialOrd + Sub<Output=Self> {}
-impl LerpFactor for f32 {}
 impl LerpFactor for f64 {}
+impl LerpFactor for f32 {}
 
 pub trait Lerp<F: LerpFactor> {
     fn lerp(self, other: Self, t: F) -> Self;
@@ -39,12 +39,12 @@ macro_rules! impl_lerp {
     }
 }
 
-impl_lerp!(Vector3<f64>, f64);
-impl_lerp!(f64, f64);
-impl_lerp!(Rad<f64>, f64);
+impl_lerp!(Vector3<f32>, f32);
+impl_lerp!(f32, f32);
+impl_lerp!(Rad<f32>, f32);
 
-impl Lerp<f64> for Point3<f64> {
-    fn lerp(self, other: Self, t: f64) -> Self {
+impl Lerp<f32> for Point3<f32> {
+    fn lerp(self, other: Self, t: f32) -> Self {
         self * (1.0 - t) + other.to_vec() * t
     }
 }

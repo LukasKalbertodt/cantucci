@@ -9,11 +9,13 @@ use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use threadpool::ThreadPool;
 use util::ToArr;
 
-mod octree;
 mod buffer;
+mod octree;
+mod view;
 
 use self::octree::{Octree, SpanExt};
-use self::buffer::{MeshBuffer, MeshView};
+use self::buffer::MeshBuffer;
+use self::view::MeshView;
 
 /// Type to manage the graphical representation of the fractal. It updates the
 /// internal data depending on the camera position and resolution.
@@ -22,8 +24,8 @@ pub struct FractalMesh<Sh> {
     program: Program,
     shape: Sh,
     thread_pool: ThreadPool,
-    new_meshes: Receiver<(Point3<f64>, MeshBuffer)>,
-    mesh_tx: Sender<(Point3<f64>, MeshBuffer)>,
+    new_meshes: Receiver<(Point3<f32>, MeshBuffer)>,
+    mesh_tx: Sender<(Point3<f32>, MeshBuffer)>,
     active_jobs: u64,
 }
 
@@ -33,7 +35,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
 
         // Setup empty tree and split first level to have 8 children
         let mut tree = Octree::spanning(
-            Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0)
+            Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
         );
         let _ = tree.root_mut().split();
         for mut child in tree.root_mut().into_children().unwrap() {
@@ -47,10 +49,8 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         info!("Using {} threads to generate fractal", num_threads);
 
         // Load Shader program
-        let prog = try!(
-            load_program(facade, "point-cloud-mandelbulb")
-                .chain_err(|| "loading program for fractal mesh failed")
-        );
+        let prog = load_program(facade, "iso-surface")
+            .chain_err(|| "loading program for fractal mesh failed")?;
 
         Ok(FractalMesh {
             tree: tree,
@@ -112,9 +112,9 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
             max: u32,
         }
 
-        fn desired_resolution(p: Point3<f64>, eye: Point3<f64>) -> ResolutionQuery {
-            const PRECISION_MUTIPLIER: f64 = 150.0;
-            const MAX_RES: f64 = 250.0;
+        fn desired_resolution(p: Point3<f32>, eye: Point3<f32>) -> ResolutionQuery {
+            const PRECISION_MUTIPLIER: f32 = 150.0;
+            const MAX_RES: f32 = 250.0;
 
             let desired = 1.0/(p - eye).magnitude() * PRECISION_MUTIPLIER;
             let desired = clamp(desired, 0.0, MAX_RES);

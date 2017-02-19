@@ -8,32 +8,32 @@ use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which the camera can fly
 /// around
-const MAX_MOVE_SPEED: f64 = 1.0;
+const MAX_MOVE_SPEED: f32 = 1.0;
 
 /// This describes how slowly the maximum speed is reached. Precisely, it's
 /// the time (in seconds) it takes to accelerate from speed 'x' to speed
 /// '(MAX_MOVE_SPEED + x) / 2'.
-const MOVE_DELAY: f64 = 0.05;
+const MOVE_DELAY: f32 = 0.05;
 
 /// How much faster the move speed is when going into fast mode.
-const FAST_MOVE_MULTIPLIER: f64 = 3.0;
+const FAST_MOVE_MULTIPLIER: f32 = 3.0;
 
 /// Describes how much the angle of the look at vector is changed, when the
 /// mouse moves one pixel. This is doubled for phi, as its range is twice as
 /// big.
-const TURN_PER_PIXEL: Rad<f64> = Rad(0.0015);
+const TURN_PER_PIXEL: Rad<f32> = Rad(0.0015);
 
 pub struct Fly {
     cam: Camera,
 
     facade: GlutinFacade,
 
-    forward_speed: f64,
-    forward_accel: f64,
-    left_speed: f64,
-    left_accel: f64,
-    up_speed: f64,
-    up_accel: f64,
+    forward_speed: f32,
+    forward_accel: f32,
+    left_speed: f32,
+    left_accel: f32,
+    up_speed: f32,
+    up_accel: f32,
     faster: bool,
 }
 
@@ -78,12 +78,12 @@ impl CamControl for Fly {
         &mut self.cam.projection
     }
 
-    fn update(&mut self, delta: f64, shape: &Shape) {
-        fn update_speed(speed: &mut f64, accel: f64, delta: f64) {
+    fn update(&mut self, delta: f32, shape: &Shape) {
+        fn update_speed(speed: &mut f32, accel: f32, delta: f32) {
             *speed = lerp(
                 *speed,
                 accel * MAX_MOVE_SPEED,
-                (1.0 - 2.0f64.powf(-delta / MOVE_DELAY)),
+                (1.0 - 2.0f32.powf(-delta / MOVE_DELAY)),
             );
         }
 
@@ -182,8 +182,8 @@ impl EventHandler for Fly {
                 let (x_diff, y_diff) = (x - (x_center as i32), y - (y_center as i32));
 
                 let (mut theta, mut phi) = self.cam.spherical_coords();
-                theta += TURN_PER_PIXEL * (y_diff as f64);
-                phi += TURN_PER_PIXEL * 2.0 * (-x_diff as f64);
+                theta += TURN_PER_PIXEL * (y_diff as f32);
+                phi += TURN_PER_PIXEL * 2.0 * (-x_diff as f32);
 
                 self.cam.look_at_sphere(theta, phi);
 
