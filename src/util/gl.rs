@@ -1,35 +1,50 @@
+use core::Shape;
 use errors::*;
-use glium::Program;
 use glium::backend::Facade;
+use glium::Program;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
+
+
+const SHADER_FOLDER: &'static str = "shader";
+
+
+pub fn load_program_with_shape<F: Facade, S: ShaderSource, Sh: Shape>(
+    facade: &F,
+    src: S,
+    shape: &Sh
+) -> Result<Program> {
+    let de_shader = shape.de_shader();
+    let vert_buf = load_file(src.vert_path(), "vert")?
+        .replace("// INCLUDE(DE)", &de_shader);
+    let frag_buf = load_file(src.frag_path(), "frag")?
+        .replace("// INCLUDE(DE)", &de_shader);
+
+    link_program(facade, &vert_buf, &frag_buf)
+}
+
 
 pub fn load_program<F, S>(facade: &F, src: S) -> Result<Program>
     where F: Facade,
           S: ShaderSource
 {
-    use std::fs::File;
-    use std::io::Read;
+    let vert_buf = load_file(src.vert_path(), "vert")?;
+    let frag_buf = load_file(src.frag_path(), "frag")?;
 
-    const SHADER_FOLDER: &'static str = "shader";
+    link_program(facade, &vert_buf, &frag_buf)
+}
 
-    let shader_folder = Path::new(SHADER_FOLDER);
-
-    // Load vertex shader
-    let vert_path = shader_folder.join(src.vert_path()).with_extension("vert");
-    debug!("Loading vertex shader '{}' ...", vert_path.display());
-
-    let mut vert_buf = String::new();
-    File::open(vert_path).and_then(|mut f| f.read_to_string(&mut vert_buf))?;
-
-    // Load fragment shader
-    let frag_path = shader_folder.join(src.frag_path()).with_extension("frag");
-    debug!("Loading fragment shader '{}' ...", frag_path.display());
-
-    let mut frag_buf = String::new();
-    File::open(frag_path).and_then(|mut f| f.read_to_string(&mut frag_buf))?;
-
-    // Link program
+fn link_program<F: Facade>(
+    facade: &F,
+    vert_buf: &str,
+    frag_buf: &str,
+) -> Result<Program> {
     debug!("Linking program ...");
+
+    trace!("Vertex shader:\n{}", vert_buf);
+    trace!("Fragment shader:\n{}", frag_buf);
+
     Program::from_source(
         facade,
         &vert_buf,
@@ -41,6 +56,17 @@ pub fn load_program<F, S>(facade: &F, src: S) -> Result<Program>
 
         e.into()
     })
+}
+
+fn load_file(file_name: &Path, ext: &str) -> Result<String> {
+    let shader_folder = Path::new(SHADER_FOLDER);
+    let path = shader_folder.join(file_name).with_extension(ext);
+    debug!("Loading shader '{}' ...", path.display());
+
+    let mut buf = String::new();
+    File::open(path).and_then(|mut f| f.read_to_string(&mut buf))?;
+
+    Ok(buf)
 }
 
 pub trait ShaderSource {

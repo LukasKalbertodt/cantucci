@@ -9,10 +9,11 @@ use util::grid::GridTable;
 #[derive(Copy, Clone)]
 pub struct Vertex {
     position: [f32; 3],
+    normal: [f32; 3],
     distance_from_surface: f32,
 }
 
-implement_vertex!(Vertex, position, distance_from_surface);
+implement_vertex!(Vertex, position, normal, distance_from_surface);
 
 
 pub struct MeshBuffer {
@@ -238,8 +239,21 @@ impl MeshBuffer {
             // color the vertex.
             let dist_p = shape.distance(p);
 
+            let normal = {
+                let delta = 0.01 * (span.end - span.start) / resolution as f32;
+                Vector3::new(
+                    shape.distance(p + Vector3::unit_x() * delta.x).min
+                        - shape.distance(p +  Vector3::unit_x() * -delta.x).min,
+                    shape.distance(p + Vector3::unit_y() * delta.y).min
+                        - shape.distance(p +  Vector3::unit_y() * -delta.y).min,
+                    shape.distance(p + Vector3::unit_z() * delta.z).min
+                        - shape.distance(p +  Vector3::unit_z() * -delta.z).min,
+                ).normalize()
+            };
+
             raw_vbuf.push(Vertex {
                 position: p.to_vec().cast::<f32>().to_arr(),
+                normal: normal.to_arr(),
                 distance_from_surface: dist_p.min as f32,
             });
             Some(raw_vbuf.len() as u32 - 1)

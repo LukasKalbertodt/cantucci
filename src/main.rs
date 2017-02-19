@@ -16,10 +16,10 @@ extern crate threadpool;
 mod app;
 mod camera;
 mod control;
+mod env;
 mod errors;
 mod event;
 mod mesh;
-mod sky;
 mod util;
 
 

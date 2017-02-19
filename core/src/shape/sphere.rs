@@ -29,4 +29,14 @@ impl Shape for Sphere {
             max: d,
         }
     }
+
+    fn de_shader(&self) -> String {
+        let s = include_str!("shape.frag")
+            .replace("{X}", &self.center.x.to_string())
+            .replace("{Y}", &self.center.y.to_string())
+            .replace("{Z}", &self.center.z.to_string())
+            .replace("{RADIUS}", &self.radius.to_string());
+
+        s
+    }
 }
