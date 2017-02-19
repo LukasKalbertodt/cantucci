@@ -1,7 +1,5 @@
 #version 140
 
-// INCLUDE(DE)
-
 in vec3 world_pos;
 
 out vec3 color;
@@ -12,8 +10,8 @@ void main() {
     // Calculate spherical coordinates
     vec3 unit = normalize(world_pos);
     float theta = acos(unit.z);         // z in [-1...1] => theta in [PI..0]
-    float thn = theta / PI;
-    float phi = atan(unit.y, unit.x);     // Phi is in [0..2PI]
+    float thn = theta / PI;             // normalize to [1..0]
+    float phi = atan(unit.y, unit.x);   // Phi is in [0..2PI]
 
     // Color definitions
     vec3 horizon_blue = vec3(0.03, 0.45, 0.9);
@@ -24,11 +22,13 @@ void main() {
         // Upper hemisphere
         color = mix(top_blue, horizon_blue, pow(thn * 2, 2));
     } else if (thn <= 0.55) {
+        // Horizon
         color = horizon_blue;
     } else {
+        // Lower hemisphere
         color = mix(buttom_grey, horizon_blue, pow((1.05 - thn) * 2, 4));
     }
+
+    // Make one half of the screen a bit brighter
     color *= 1 - 0.3 * sin(phi) * sin(theta);
-
-
 }
