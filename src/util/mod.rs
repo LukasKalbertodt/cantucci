@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use core::math::*;
 
 pub mod gl;

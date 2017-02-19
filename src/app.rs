@@ -56,6 +56,7 @@ impl App {
         use std::time::{Duration, Instant};
         use std::io::{self, Write};
 
+        // Code for printing FPS and frame time
         const PRINT_FPS_EVERY_MS: u64 = 200;
         let mut next_fps_print_in = Duration::from_millis(PRINT_FPS_EVERY_MS);
         let mut frame_count = 0;
@@ -123,7 +124,7 @@ impl App {
         let mut new_res = None;
         let print_fps = &mut self.print_fps;
 
-        let out = poll_events_with(&self.facade, vec![
+        let out = poll_events_with(&self.facade, &mut [
             self.control.as_event_handler(),
             &mut QuitHandler,
             &mut |e: &Event| {
