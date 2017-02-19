@@ -3,6 +3,7 @@ use core::math::*;
 
 pub mod gl;
 pub mod iter;
+pub mod grid;
 
 
 pub trait ToArr {

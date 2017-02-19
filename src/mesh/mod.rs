@@ -9,11 +9,13 @@ use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use threadpool::ThreadPool;
 use util::ToArr;
 
-mod octree;
 mod buffer;
+mod octree;
+mod view;
 
 use self::octree::{Octree, SpanExt};
-use self::buffer::{MeshBuffer, MeshView};
+use self::buffer::MeshBuffer;
+use self::view::MeshView;
 
 /// Type to manage the graphical representation of the fractal. It updates the
 /// internal data depending on the camera position and resolution.
@@ -33,7 +35,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
 
         // Setup empty tree and split first level to have 8 children
         let mut tree = Octree::spanning(
-            Point3::new(-1.0, -1.0, -1.0) .. Point3::new(1.0, 1.0, 1.0)
+            Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
         );
         let _ = tree.root_mut().split();
         for mut child in tree.root_mut().into_children().unwrap() {
