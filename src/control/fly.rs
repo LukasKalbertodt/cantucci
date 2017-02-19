@@ -21,7 +21,7 @@ const FAST_MOVE_MULTIPLIER: f32 = 3.0;
 /// Describes how much the angle of the look at vector is changed, when the
 /// mouse moves one pixel. This is doubled for phi, as its range is twice as
 /// big.
-const TURN_PER_PIXEL: Rad<f32> = Rad(0.0015);
+const TURN_PER_PIXEL: Rad<f32> = Rad(0.00025);
 
 pub struct Fly {
     cam: Camera,
