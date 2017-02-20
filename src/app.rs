@@ -86,6 +86,7 @@ impl App {
             target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
             self.env.sky().draw(&mut target, &self.control.camera())?;
+            self.env.sun().draw(&mut target, &self.control.camera())?;
             self.mesh.draw(&mut target, &self.control.camera(), &self.env);
 
             target.finish().unwrap();

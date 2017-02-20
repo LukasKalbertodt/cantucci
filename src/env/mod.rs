@@ -1,13 +1,18 @@
-use camera::Camera;
-use core::math::*;
+//! This module contains the definition of all environment things. This
+//! includes the sky and sun, but possible more things in the future.
+//!
+//! The `Environment` type creates and handles all components.
+//!
+
 use errors::*;
 use glium::backend::Facade;
-use glium::index::PrimitiveType;
-use glium::{DrawParameters, IndexBuffer, Program, Surface, VertexBuffer};
-use util::ToArr;
-use util;
 
-
+/// How far the sky is from the camera. This whole environment is drawn first
+/// and doesn't use any depth test. The whole environment is invariant to
+/// camera position (or "moves with the camera"), so the camera can't ever
+/// leave the environment. So this distance can be choosen pretty arbitrary as
+/// long as it's between the near and far plane.
+const SKY_DISTANCE: f32 = 10.0;
 
 mod sky;
 mod sun;
@@ -21,6 +26,7 @@ pub struct Environment {
 }
 
 impl Environment {
+    // Creates a all components of the new environment.
     pub fn new<F: Facade>(facade: &F) -> Result<Self> {
         Ok(Environment {
             sun: Sun::new(facade)?,
@@ -28,6 +34,7 @@ impl Environment {
         })
     }
 
+    // Updates all components of the environment.
     pub fn update(&mut self, delta: f32) {
         self.sun.update(delta);
     }

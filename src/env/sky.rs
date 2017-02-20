@@ -1,18 +1,13 @@
-use camera::Camera;
-use core::math::*;
-use errors::*;
 use glium::backend::Facade;
 use glium::index::PrimitiveType;
 use glium::{DrawParameters, IndexBuffer, Program, Surface, VertexBuffer};
-use util::ToArr;
-use util;
 
-#[derive(Copy, Clone)]
-struct Vertex {
-    pos: [f32; 3],
-}
+use camera::Camera;
+use core::math::*;
+use errors::*;
+use super::SKY_DISTANCE;
+use util::{self, ToArr};
 
-implement_vertex!(Vertex, pos);
 
 /// Represents a simple sky dome.
 pub struct Sky {
@@ -25,14 +20,13 @@ impl Sky {
     /// Creates all resources necessary to draw a sky.
     pub fn new<F: Facade>(facade: &F) -> Result<Self> {
         // We represent the sky by a diamond shaped mesh.
-        const SIZE: f32 = 10.0;
         let raw_vbuf = [
-            Vertex { pos: [-SIZE,   0.0,   0.0] },  // -x
-            Vertex { pos: [  0.0, -SIZE,   0.0] },  // -y
-            Vertex { pos: [ SIZE,   0.0,   0.0] },  // +x
-            Vertex { pos: [  0.0,  SIZE,   0.0] },  // +y
-            Vertex { pos: [  0.0,   0.0, -SIZE] },  // -z
-            Vertex { pos: [  0.0,   0.0,  SIZE] },  // +z
+            Vertex { pos: [-SKY_DISTANCE,           0.0,           0.0] },  // -x
+            Vertex { pos: [          0.0, -SKY_DISTANCE,           0.0] },  // -y
+            Vertex { pos: [ SKY_DISTANCE,           0.0,           0.0] },  // +x
+            Vertex { pos: [          0.0,  SKY_DISTANCE,           0.0] },  // +y
+            Vertex { pos: [          0.0,           0.0, -SKY_DISTANCE] },  // -z
+            Vertex { pos: [          0.0,           0.0,  SKY_DISTANCE] },  // +z
         ];
 
         let raw_ibuf = [
@@ -55,7 +49,6 @@ impl Sky {
             PrimitiveType::TrianglesList,
             &raw_ibuf,
         )?;
-
         let program = util::gl::load_program(facade, "sky")?;
 
         Ok(Sky {
@@ -91,3 +84,10 @@ impl Sky {
         Ok(())
     }
 }
+
+#[derive(Copy, Clone)]
+struct Vertex {
+    pos: [f32; 3],
+}
+
+implement_vertex!(Vertex, pos);
