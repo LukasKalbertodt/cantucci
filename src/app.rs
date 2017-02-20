@@ -8,7 +8,7 @@ use errors::*;
 use event::{EventResponse, poll_events_with, QuitHandler};
 use glium::backend::glutin_backend::GlutinFacade;
 use mesh::FractalMesh;
-use sky::Sky;
+use env::Environment;
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
@@ -16,8 +16,8 @@ pub struct App {
     facade: GlutinFacade,
     control: Box<CamControl>,
     mesh: FractalMesh<Mandelbulb>,
-    sky: Sky,
     // mesh: FractalMesh<Sphere>,
+    env: Environment,
     print_fps: bool,
 }
 
@@ -30,7 +30,7 @@ impl App {
         let facade = create_context()
             .chain_err(|| "failed to create GL context")?;
 
-        let shape = Mandelbulb::classic(5, 2.5);
+        let shape = Mandelbulb::classic(3, 2.5);
         // let shape = Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0);
         let mesh = FractalMesh::new(&facade, shape)?;
 
@@ -44,13 +44,13 @@ impl App {
         let fly = FlyControl::new(orbit.camera().clone(), &facade);
         let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
 
-        let sky = Sky::new(&facade)?;
+        let env = Environment::new(&facade)?;
 
         Ok(App {
             facade: facade,
             control: Box::new(switcher),
             mesh: mesh,
-            sky: sky,
+            env: env,
             print_fps: false,
         })
     }
@@ -76,6 +76,7 @@ impl App {
             let delta_sec = (delta.subsec_nanos() / 1000) as f32 / 1_000_000.0;
 
             self.control.update(delta_sec, self.mesh.shape());
+            self.env.update(delta_sec);
             self.mesh.update(&self.facade, &self.control.camera());
 
             last_time = Instant::now();
@@ -84,8 +85,9 @@ impl App {
             let mut target = self.facade.draw();
             target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
-            self.sky.draw(&mut target, &self.control.camera())?;
-            self.mesh.draw(&mut target, &self.control.camera());
+            self.env.sky().draw(&mut target, &self.control.camera())?;
+            self.env.sun().draw(&mut target, &self.control.camera())?;
+            self.mesh.draw(&mut target, &self.control.camera(), &self.env);
 
             target.finish().unwrap();
 

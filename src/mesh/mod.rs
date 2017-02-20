@@ -8,6 +8,7 @@ use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use threadpool::ThreadPool;
 use util::ToArr;
+use env::Environment;
 
 mod buffer;
 mod octree;
@@ -31,7 +32,7 @@ pub struct FractalMesh<Sh> {
 
 impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
     pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
-        use util::gl::load_program;
+        use util::gl::load_program_with_shape;
 
         // Setup empty tree and split first level to have 8 children
         let mut tree = Octree::spanning(
@@ -49,7 +50,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         info!("Using {} threads to generate fractal", num_threads);
 
         // Load Shader program
-        let prog = load_program(facade, "iso-surface")
+        let prog = load_program_with_shape(facade, "iso-surface", &shape)
             .chain_err(|| "loading program for fractal mesh failed")?;
 
         Ok(FractalMesh {
@@ -124,7 +125,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
                 // desired: desired as u32,
                 // max: (desired * 4.0) as u32,
                 min: 0,
-                desired: 64,
+                desired: 100,
                 max: 1_000_000,
             }
         }
@@ -182,10 +183,16 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         }
     }
 
-    pub fn draw<S: Surface>(&self, surface: &mut S, camera: &Camera) {
+    pub fn draw<S: Surface>(
+        &self,
+        surface: &mut S,
+        camera: &Camera,
+        env: &Environment,
+    ) {
         let uniforms = uniform! {
             view_matrix: camera.view_transform().to_arr(),
             proj_matrix: camera.proj_transform().to_arr(),
+            light_dir: env.sun().light_dir().to_arr(),
         };
 
         let params = DrawParameters {

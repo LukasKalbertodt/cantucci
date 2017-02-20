@@ -22,4 +22,14 @@ pub trait Shape: Send {
 
     /// Returns true iff the given point lies in the shape.
     fn contains(&self, p: Point3<f32>) -> bool;
+
+    /// Returns a string containing the GLSL definition of the distance
+    /// estimator.
+    ///
+    /// The GLSL function needs to have this signature:
+    ///
+    /// ```
+    /// float shape_de(vec3 point)
+    /// ```
+    fn de_shader(&self) -> String;
 }

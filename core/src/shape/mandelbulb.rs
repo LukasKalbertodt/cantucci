@@ -63,11 +63,9 @@ impl Shape for Mandelbulb {
         let mut dr = 1.0;
         let mut r = 0.0;
 
-        const BAILOUT: f32 = 2.5;
-
         for _ in 0..self.max_iters {
             r = z.to_vec().magnitude();
-            if r > BAILOUT || (1.0 / r).is_infinite() {
+            if r > self.bailout || (1.0 / r).is_infinite() {
                 break;
             }
 
@@ -97,5 +95,14 @@ impl Shape for Mandelbulb {
             min: lower,
             max: 4.0 * lower,
         }
+    }
+
+    fn de_shader(&self) -> String {
+        let s = include_str!("mandelbulb.frag")
+            .replace("{BAILOUT}", &self.bailout.to_string())
+            .replace("{MAX_ITERS}", &self.max_iters.to_string())
+            .replace("{POWER}", &self.power.to_string());
+
+        s
     }
 }
