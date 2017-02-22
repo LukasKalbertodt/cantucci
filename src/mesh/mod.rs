@@ -1,40 +1,49 @@
-use camera::Camera;
-use core::math::*;
-use core::Shape;
-use errors::*;
 use glium::backend::Facade;
-use glium::{self, DepthTest, Program, Surface, DrawParameters};
+use glium::Surface;
 use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use threadpool::ThreadPool;
-use util::ToArr;
+
+use camera::Camera;
+use core::math::*;
+use core::Shape;
 use env::Environment;
+use errors::*;
 
 mod buffer;
 mod octree;
+mod renderer;
 mod view;
 
 use self::octree::{Octree, SpanExt};
 use self::buffer::MeshBuffer;
 use self::view::MeshView;
+use self::renderer::Renderer;
 
-/// Type to manage the graphical representation of the fractal. It updates the
+/// Type to manage the graphical representation of the shape. It updates the
 /// internal data depending on the camera position and resolution.
 pub struct FractalMesh<Sh> {
+    /// This octree holds the whole mesh.
     tree: Octree<MeshStatus>,
-    program: Program,
+
+    /// Holds global data (like the OpenGL program) to render the mesh.
+    renderer: Renderer,
+
+    /// The shape this mesh represents.
     shape: Sh,
+
+    // The following fields are simply to manage the generation of the mesh on
+    // multiple threads.
     thread_pool: ThreadPool,
     new_meshes: Receiver<(Point3<f32>, MeshBuffer)>,
     mesh_tx: Sender<(Point3<f32>, MeshBuffer)>,
     active_jobs: u64,
 }
 
-impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
+impl<Sh: Shape + Clone> FractalMesh<Sh> {
     pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
-        use util::gl::load_program_with_shape;
-
-        // Setup empty tree and split first level to have 8 children
+        // Setup an empty tree and split the first two levels which results in
+        // 8² = 64 children
         let mut tree = Octree::spanning(
             Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
         );
@@ -43,19 +52,18 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
             child.split();
         }
 
-        // Prepare thread pool and channels to communicate
+        // Prepare channels and thread pool to generate the mesh on all CPU
+        // cores
         let (tx, rx) = channel();
         let num_threads = num_cpus::get();
         let pool = ThreadPool::new(num_threads);
-        info!("Using {} threads to generate fractal", num_threads);
+        info!("Using {} threads to generate mesh", num_threads);
 
-        // Load Shader program
-        let prog = load_program_with_shape(facade, "iso-surface", &shape)
-            .chain_err(|| "loading program for fractal mesh failed")?;
+        let renderer = Renderer::new(facade, &shape)?;
 
         Ok(FractalMesh {
             tree: tree,
-            program: prog,
+            renderer: renderer,
             shape: shape,
             thread_pool: pool,
             new_meshes: rx,
@@ -68,7 +76,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         &self.shape
     }
 
-    pub fn update<F: Facade>(&mut self, facade: &F, cam: &Camera) {
+    pub fn update<F: Facade>(&mut self, facade: &F, cam: &Camera) -> Result<()> {
         let jobs_before = self.active_jobs;
 
         // Collect generated meshes and prepare them for rendering
@@ -83,10 +91,10 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
 
                     // Create OpenGL view from raw buffer and save it in the
                     // tree
-                    let mesh_view = MeshView::from_raw_buf(buf, facade);
+                    let mesh_view = MeshView::from_raw_buf(buf, facade)?;
                     *self.tree
                         .leaf_mut_around(center)
-                        .leaf_data()
+                        .leaf_data_mut()
                         .unwrap() = Some(MeshStatus::Ready(mesh_view));
                 }
                 Err(TryRecvError::Empty) => {
@@ -140,7 +148,7 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
             let desired_res = desired_resolution(leaf.span().center(), cam.position);
 
             // Decide whether or not to generate a new buffer for this leaf
-            let generate = match *leaf.leaf_data().unwrap() {
+            let generate = match *leaf.leaf_data_mut().unwrap() {
                 Some(MeshStatus::Ready(ref view)) => {
                     let leaf_res = view.raw_buf().resolution();
                     leaf_res < desired_res.min || leaf_res > desired_res.max
@@ -168,11 +176,11 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
 
                 self.active_jobs += 1;
 
-                let old_view = match leaf.leaf_data().unwrap().take() {
+                let old_view = match leaf.leaf_data_mut().unwrap().take() {
                     Some(MeshStatus::Ready(view)) => Some(view),
                     _ => None,
                 };
-                *leaf.leaf_data().unwrap() = Some(MeshStatus::Requested {
+                *leaf.leaf_data_mut().unwrap() = Some(MeshStatus::Requested {
                     old_view: old_view,
                 });
             }
@@ -181,47 +189,31 @@ impl<Sh: Shape + 'static + Clone> FractalMesh<Sh> {
         if jobs_before != self.active_jobs {
             trace!("Currently active sample jobs: {}", self.active_jobs);
         }
+
+        Ok(())
     }
 
+    // Draws the whole shape by traversing the internal octree.
     pub fn draw<S: Surface>(
         &self,
         surface: &mut S,
         camera: &Camera,
         env: &Environment,
-    ) {
-        let uniforms = uniform! {
-            view_matrix: camera.view_transform().to_arr(),
-            proj_matrix: camera.proj_transform().to_arr(),
-            light_dir: env.sun().light_dir().to_arr(),
-        };
-
-        let params = DrawParameters {
-            point_size: Some(2.0),
-            depth: glium::Depth {
-                write: true,
-                test: DepthTest::IfLess,
-                .. Default::default()
-            },
-            // polygon_mode: PolygonMode::Line,
-            // backface_culling: ::glium::draw_parameters::BackfaceCullingMode::CullingDisabled,
-            .. DrawParameters::default()
-        };
-
-        for entry in &self.tree {
-            match entry.leaf_data() {
-                Some(&MeshStatus::Ready(ref view)) |
-                Some(&MeshStatus::Requested { old_view: Some(ref view) }) => {
-                    surface.draw(
-                        view.vbuf(),
-                        view.ibuf(),
-                        &self.program,
-                        &uniforms,
-                        &params,
-                    ).expect("drawing on surface failed!");
+    ) -> Result<()> {
+        // Visit each node of the tree
+        // TODO: we might want visit the nodes in a different order (see #16)
+        for leaf_data in self.tree.iter().filter_map(|e| e.leaf_data()) {
+            match leaf_data {
+                // If there is a view available, render it
+                &MeshStatus::Ready(ref view) |
+                &MeshStatus::Requested { old_view: Some(ref view) } => {
+                    view.draw(surface, camera, env, &self.renderer)?;
                 }
                 _ => (),
             }
         }
+
+        Ok(())
     }
 }
 

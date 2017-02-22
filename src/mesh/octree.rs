@@ -243,7 +243,7 @@ impl<'a, T> NodeEntryMut<'a, T> {
 
     /// If the referenced node is a leaf node and this leaf node contains a
     /// value, that value is returned; `None` otherwise.
-    pub fn leaf_data<'b>(&'b mut self) -> Option<&'b mut Option<T>> {
+    pub fn leaf_data_mut<'b>(&'b mut self) -> Option<&'b mut Option<T>> {
         match *self.node {
             Octnode::Leaf(ref mut data) => Some(data),
             _ => None,

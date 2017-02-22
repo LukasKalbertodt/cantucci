@@ -1,14 +1,17 @@
+use glium::backend::glutin_backend::GlutinFacade;
+
 use camera::Projection;
-use control::Orbit as OrbitControl;
 use control::Fly as FlyControl;
+use control::Orbit as OrbitControl;
 use control::{CamControl, KeySwitcher};
 use core::math::*;
+// TODO: remove attribute once Shape can be used as trait object (see #18)
+#[allow(unused_imports)]
 use core::shape::{Mandelbulb, Sphere};
+use env::Environment;
 use errors::*;
 use event::{EventResponse, poll_events_with, QuitHandler};
-use glium::backend::glutin_backend::GlutinFacade;
 use mesh::FractalMesh;
-use env::Environment;
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
@@ -77,7 +80,7 @@ impl App {
 
             self.control.update(delta_sec, self.mesh.shape());
             self.env.update(delta_sec);
-            self.mesh.update(&self.facade, &self.control.camera());
+            self.mesh.update(&self.facade, &self.control.camera())?;
 
             last_time = Instant::now();
 
@@ -87,7 +90,7 @@ impl App {
 
             self.env.sky().draw(&mut target, &self.control.camera())?;
             self.env.sun().draw(&mut target, &self.control.camera())?;
-            self.mesh.draw(&mut target, &self.control.camera(), &self.env);
+            self.mesh.draw(&mut target, &self.control.camera(), &self.env)?;
 
             target.finish().unwrap();
 
@@ -173,7 +176,7 @@ fn create_context() -> Result<GlutinFacade> {
     let monitor = get_primary_monitor();
     let (monitor_width, monitor_height) = monitor.get_dimensions();
     info!(
-        "Starting on monitor '{}' ({}x{}px)",
+        "Primary monitor: '{}' ({}x{}px)",
         monitor.get_name().unwrap_or("???".into()),
         monitor_width,
         monitor_height,
