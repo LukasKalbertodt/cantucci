@@ -93,7 +93,7 @@ impl<Sh: Shape + Clone> FractalMesh<Sh> {
                     // tree
                     let mesh_view = MeshView::from_raw_buf(buf, facade)?;
                     *self.tree
-                        .leaf_mut_around(center)
+                        .leaf_around_mut(center)
                         .leaf_data_mut()
                         .unwrap() = Some(MeshStatus::Ready(mesh_view));
                 }
