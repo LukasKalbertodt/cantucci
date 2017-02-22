@@ -92,6 +92,18 @@ impl<T> Octree<T> {
             ]
         }
     }
+
+    /// Returns an iterator over mutable nodes
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        IterMut {
+            to_visit: vec![
+                NodeEntryMut {
+                    span: self.span(),
+                    node: &mut self.root,
+                }
+            ]
+        }
+    }
 }
 
 // `IntoIterator` impls for convenience
@@ -101,6 +113,15 @@ impl<'a, T> IntoIterator for &'a Octree<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Octree<T> {
+    type Item = IterElemMut<'a, T>;
+    type IntoIter = IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -245,10 +266,31 @@ impl<'a, T> NodeEntryMut<'a, T> {
 
     /// If the referenced node is a leaf node and this leaf node contains a
     /// value, that value is returned; `None` otherwise.
+    pub fn leaf_data(&self) -> Option<&Option<T>> {
+        // Warning: you can't return `&'a` here. Don't waste time by
+        // trying! See:
+        // http://stackoverflow.com/q/42397056/2408867
+        match *self.node {
+            Octnode::Leaf(ref data) => Some(data),
+            _ => None,
+        }
+    }
+
+    /// If the referenced node is a leaf node and this leaf node contains a
+    /// value, that value is returned; `None` otherwise.
     pub fn leaf_data_mut(&mut self) -> Option<&mut Option<T>> {
         // Warning: you can't return `&'a mut` here. Don't waste time by
         // trying! See:
         // http://stackoverflow.com/q/42397056/2408867
+        match *self.node {
+            Octnode::Leaf(ref mut data) => Some(data),
+            _ => None,
+        }
+    }
+
+    /// If the referenced node is a leaf node and this leaf node contains a
+    /// value, that value is returned; `None` otherwise.
+    pub fn into_leaf_data(self) -> Option<&'a mut Option<T>> {
         match *self.node {
             Octnode::Leaf(ref mut data) => Some(data),
             _ => None,
@@ -313,5 +355,61 @@ impl<'a, T> NodeEntryMut<'a, T> {
         );
 
         out
+    }
+}
+
+// ===========================================================================
+/// The mutable iterator produces elements of this type.
+///
+/// The mutable iterator can't produce `NodeEntryMut`, because multiple mutable
+/// references could be obtained which could lead to iterator invalidation or
+/// worse (which is of course prevented by the borrow checker).
+pub enum IterElemMut<'a, T: 'a> {
+    Leaf {
+        span: Span,
+        data: &'a mut Option<T>,
+    },
+    Inner(Span),
+}
+
+impl<'a, T> IterElemMut<'a, T> {
+    pub fn into_leaf(self) -> Option<(Span, &'a mut Option<T>)> {
+        match self {
+            IterElemMut::Leaf { span, data } => Some((span, data)),
+            _ => None,
+        }
+    }
+
+    pub fn span(&self) -> Span {
+        match *self {
+            IterElemMut::Leaf { ref span, .. } => span,
+            IterElemMut::Inner(ref span) => span,
+        }.clone()
+    }
+}
+
+
+/// An iterator over mutable references of nodes
+pub struct IterMut<'a, T: 'a> {
+    to_visit: Vec<NodeEntryMut<'a, T>>,
+}
+
+impl<'a, T: 'a> Iterator for IterMut<'a, T> {
+    type Item = IterElemMut<'a, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.to_visit.pop().map(|next| {
+            if next.is_leaf() {
+                IterElemMut::Leaf {
+                    span: next.span(),
+                    data: next.into_leaf_data().unwrap(),
+                }
+            } else {
+                let span = next.span();
+                let children = next.into_children().unwrap();
+                self.to_visit.extend(ArrayVec::from(children));
+                IterElemMut::Inner(span)
+            }
+        })
     }
 }

@@ -1,7 +1,7 @@
 use glium::backend::Facade;
 use glium::Surface;
 use num_cpus;
-use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use threadpool::ThreadPool;
 
 use camera::Camera;
@@ -76,114 +76,63 @@ impl<Sh: Shape + Clone> FractalMesh<Sh> {
         &self.shape
     }
 
-    pub fn update<F: Facade>(&mut self, facade: &F, cam: &Camera) -> Result<()> {
+    /// Updates the mesh representing the shape.
+    pub fn update<F: Facade>(&mut self, facade: &F, _: &Camera) -> Result<()> {
         let jobs_before = self.active_jobs;
 
-        // Collect generated meshes and prepare them for rendering
-        loop {
-            // TODO: we might want to measure the time, to avoid blocking
-            // in this main thread for too long
+        // Collect generated meshes and prepare them for rendering.
+        for (center, buf) in self.new_meshes.try_iter() {
+            self.active_jobs -= 1;
 
-            // If the channel can yield one item
-            match self.new_meshes.try_recv() {
-                Ok((center, buf)) => {
-                    self.active_jobs -= 1;
-
-                    // Create OpenGL view from raw buffer and save it in the
-                    // tree
-                    let mesh_view = MeshView::from_raw_buf(buf, facade)?;
-                    *self.tree
-                        .leaf_around_mut(center)
-                        .leaf_data_mut()
-                        .unwrap() = Some(MeshStatus::Ready(mesh_view));
-                }
-                Err(TryRecvError::Empty) => {
-                    // That's fine, we check again next time
-                    break
-                }
-                Err(TryRecvError::Disconnected) => {
-                    // It's stupid to say that, but this can't happen...
-                    // This only happens if all `Sender`s were destroyed and
-                    // since we have one `Sender` saved in this struct: when
-                    // this cases occurs, something is *way* kaputt!
-                    panic!("All senders have hung up...");
-                }
-            }
+            // Create OpenGL view from raw buffer and save it in the
+            // tree.
+            // We haven't yet measured how expensive this is. If it gets too
+            // slow, we might want to limit the number of `from_raw_buf()`
+            // calls we can do in one `update()` call in order to avoid
+            // too high frame times.
+            let mesh_view = MeshView::from_raw_buf(buf, facade)?;
+            *self.tree
+                .leaf_around_mut(center)
+                .leaf_data_mut()
+                .unwrap() = Some(MeshStatus::Ready(mesh_view));
         }
 
-        // Check camera position, calculate required precision and start new
-        // tasks if necessary
 
-        #[derive(Clone, Copy, Debug)]
-        struct ResolutionQuery {
-            min: u32,
-            desired: u32,
-            max: u32,
-        }
+        // TODO: Decide when to split nodes and when to regenerate regions
+        // of space (see #9, #8)
 
-        fn desired_resolution(p: Point3<f32>, eye: Point3<f32>) -> ResolutionQuery {
-            const PRECISION_MUTIPLIER: f32 = 150.0;
-            const MAX_RES: f32 = 250.0;
 
-            let desired = 1.0/(p - eye).magnitude() * PRECISION_MUTIPLIER;
-            let desired = clamp(desired, 0.0, MAX_RES);
+        // Here we simply start a mesh generation job for each empty leaf node
+        let empty_leaves = self.tree.iter_mut()
+            .filter_map(|n| n.into_leaf())
+            .filter(|&(_, ref leaf_data)| leaf_data.is_none());
+        for (span, leaf_data) in empty_leaves {
+            const RESOLUTION: u32 = 100;
 
-            ResolutionQuery {
-                // min: (desired / 2.0) as u32,
-                // desired: desired as u32,
-                // max: (desired * 4.0) as u32,
-                min: 0,
-                desired: 100,
-                max: 1_000_000,
-            }
-        }
+            // Prepare values to be moved into the closure
+            let tx = self.mesh_tx.clone();
+            let shape = self.shape.clone();
 
-        // TODO: iterate over all leaves
-        let leaves = self.tree.root_mut()
-            .into_children()
-            .unwrap()
-            .into_iter()
-            .flat_map(|n| n.into_children().unwrap());
-        for mut leaf in leaves {
-            let desired_res = desired_resolution(leaf.span().center(), cam.position);
+            // Generate the raw buffers on another thread
+            self.thread_pool.execute(move || {
+                let buf = MeshBuffer::generate_for_box(&span, &shape, RESOLUTION);
+                tx.send((span.center(), buf))
+                    .expect("main thread has hung up, my work was for nothing! :-(");
+            });
 
-            // Decide whether or not to generate a new buffer for this leaf
-            let generate = match *leaf.leaf_data_mut().unwrap() {
-                Some(MeshStatus::Ready(ref view)) => {
-                    let leaf_res = view.raw_buf().resolution();
-                    leaf_res < desired_res.min || leaf_res > desired_res.max
-                }
-                Some(MeshStatus::Requested { .. }) => false,
-                None => desired_res.desired > 0,
+            self.active_jobs += 1;
+
+            // If there has been an old view, we want to preserve it and
+            // continue to render it until the new one is available. This
+            // doesn't make a lot of sense right now, but might be helpful
+            // later. Or it might not.
+            let old_view = match leaf_data.take() {
+                Some(MeshStatus::Ready(view)) => Some(view),
+                _ => None,
             };
-
-            if generate {
-                // prepare values to be moved into the closure
-                let tx = self.mesh_tx.clone();
-                let span = leaf.span();
-                let shape = self.shape.clone();
-
-                // Generate the raw buffers on another thread
-                self.thread_pool.execute(move || {
-                    let buf = MeshBuffer::generate_for_box(&span, &shape, desired_res.desired);
-                    // let buf = MeshBuffer::generate_for_box(&span, &shape, 64);
-                    let res = tx.send((span.center(), buf));
-
-                    if res.is_err() {
-                        debug!("main thread has hung up, my work was for nothing! :-(");
-                    }
-                });
-
-                self.active_jobs += 1;
-
-                let old_view = match leaf.leaf_data_mut().unwrap().take() {
-                    Some(MeshStatus::Ready(view)) => Some(view),
-                    _ => None,
-                };
-                *leaf.leaf_data_mut().unwrap() = Some(MeshStatus::Requested {
-                    old_view: old_view,
-                });
-            }
+            *leaf_data = Some(MeshStatus::Requested {
+                old_view: old_view,
+            });
         }
 
         if jobs_before != self.active_jobs {
