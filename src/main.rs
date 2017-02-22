@@ -8,7 +8,6 @@ extern crate arrayvec;
 extern crate cgmath;
 extern crate core;
 extern crate env_logger;
-extern crate lazy_static;
 extern crate num_cpus;
 extern crate term_painter;
 extern crate threadpool;
