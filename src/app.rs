@@ -11,15 +11,15 @@ use core::shape::{Mandelbulb, Sphere};
 use env::Environment;
 use errors::*;
 use event::{EventResponse, poll_events_with, QuitHandler};
-use mesh::FractalMesh;
+use mesh::ShapeMesh;
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
 pub struct App {
     facade: GlutinFacade,
     control: Box<CamControl>,
-    mesh: FractalMesh<Mandelbulb>,
-    // mesh: FractalMesh<Sphere>,
+    mesh: ShapeMesh<Mandelbulb>,
+    // mesh: ShapeMesh<Sphere>,
     env: Environment,
     print_fps: bool,
 }
@@ -35,7 +35,7 @@ impl App {
 
         let shape = Mandelbulb::classic(3, 2.5);
         // let shape = Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0);
-        let mesh = FractalMesh::new(&facade, shape)?;
+        let mesh = ShapeMesh::new(&facade, shape)?;
 
         let proj = Projection::new(
             Rad(1.0),

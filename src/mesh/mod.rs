@@ -22,7 +22,7 @@ use self::renderer::Renderer;
 
 /// Type to manage the graphical representation of the shape. It updates the
 /// internal data depending on the camera position and resolution.
-pub struct FractalMesh<Sh> {
+pub struct ShapeMesh<Sh> {
     /// This octree holds the whole mesh.
     tree: Octree<MeshStatus>,
 
@@ -40,7 +40,7 @@ pub struct FractalMesh<Sh> {
     active_jobs: u64,
 }
 
-impl<Sh: Shape + Clone> FractalMesh<Sh> {
+impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
         // Setup an empty tree and split the first two levels which results in
         // 8² = 64 children
@@ -61,7 +61,7 @@ impl<Sh: Shape + Clone> FractalMesh<Sh> {
 
         let renderer = Renderer::new(facade, &shape)?;
 
-        Ok(FractalMesh {
+        Ok(ShapeMesh {
             tree: tree,
             renderer: renderer,
             shape: shape,
