@@ -1,6 +1,7 @@
-use std::ops::Range;
-use core::math::*;
 use arrayvec::ArrayVec;
+use std::ops::Range;
+
+use core::math::*;
 
 /// A box in three dimensional space that is represented by one octree node
 pub type Span = Range<Point3<f32>>;

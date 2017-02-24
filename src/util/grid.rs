@@ -1,5 +1,6 @@
-use util::iter;
 use std::ops::Index;
+
+use util::iter;
 
 /// A lookup table for regular 3D grids. Every cell in the grid contains one
 /// value.

@@ -1,10 +1,11 @@
-use core::Shape;
-use errors::*;
 use glium::backend::Facade;
 use glium::Program;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+
+use core::Shape;
+use errors::*;
 
 
 const SHADER_FOLDER: &'static str = "shader";
