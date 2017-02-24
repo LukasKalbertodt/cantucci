@@ -9,13 +9,12 @@ use core::math::*;
 use core::Shape;
 use env::Environment;
 use errors::*;
+use octree::{Octree, SpanExt};
 
 mod buffer;
-mod octree;
 mod renderer;
 mod view;
 
-use self::octree::{Octree, SpanExt};
 use self::buffer::MeshBuffer;
 use self::view::MeshView;
 use self::renderer::Renderer;

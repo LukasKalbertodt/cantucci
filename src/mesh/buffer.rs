@@ -1,6 +1,6 @@
 use core::math::*;
 use core::Shape;
-use mesh::octree::Span;
+use octree::Span;
 use util::ToArr;
 use util::iter::cube;
 use util::grid::GridTable;

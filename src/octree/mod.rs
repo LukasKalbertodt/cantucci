@@ -3,6 +3,10 @@ use std::ops::Range;
 
 use core::math::*;
 
+mod iter;
+
+pub use self::iter::{Iter, IterElemMut, IterMut};
+
 /// A box in three dimensional space that is represented by one octree node
 pub type Span = Range<Point3<f32>>;
 
@@ -84,26 +88,12 @@ impl<T> Octree<T> {
 
     /// Returns an iterator over *im*mutable nodes
     pub fn iter(&self) -> Iter<T> {
-        Iter {
-            to_visit: vec![
-                NodeEntry {
-                    node: &self.root,
-                    span: self.span(),
-                }
-            ]
-        }
+        Iter::new(self)
     }
 
     /// Returns an iterator over mutable nodes
     pub fn iter_mut(&mut self) -> IterMut<T> {
-        IterMut {
-            to_visit: vec![
-                NodeEntryMut {
-                    span: self.span(),
-                    node: &mut self.root,
-                }
-            ]
-        }
+        IterMut::new(self)
     }
 }
 
@@ -151,16 +141,6 @@ enum Octnode<T> {
 
 // ===========================================================================
 
-const SPLIT_SPAN_DIFF_AMOUNT: &'static [Vector3<f32>; 8] = &[
-    Vector3 { x: 0.0, y: 0.0, z: 0.0 },
-    Vector3 { x: 0.0, y: 0.0, z: 1.0 },
-    Vector3 { x: 0.0, y: 1.0, z: 0.0 },
-    Vector3 { x: 0.0, y: 1.0, z: 1.0 },
-    Vector3 { x: 1.0, y: 0.0, z: 0.0 },
-    Vector3 { x: 1.0, y: 0.0, z: 1.0 },
-    Vector3 { x: 1.0, y: 1.0, z: 0.0 },
-    Vector3 { x: 1.0, y: 1.0, z: 1.0 },
-];
 
 /// An *im*mutable reference to a node inside the tree that knows about its
 /// span.
@@ -222,24 +202,6 @@ impl<'a, T> NodeEntry<'a, T> {
 }
 
 // ===========================================================================
-
-/// An iterator over *im*mutable references of nodes
-pub struct Iter<'a, T: 'a> {
-    to_visit: Vec<NodeEntry<'a, T>>,
-}
-
-impl<'a, T: 'a> Iterator for Iter<'a, T> {
-    type Item = NodeEntry<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.to_visit.pop().map(|next| {
-            if let Some(children) = next.children() {
-                self.to_visit.extend(ArrayVec::from(children));
-            }
-            next
-        })
-    }
-}
 
 // ===========================================================================
 
@@ -359,58 +321,13 @@ impl<'a, T> NodeEntryMut<'a, T> {
     }
 }
 
-// ===========================================================================
-/// The mutable iterator produces elements of this type.
-///
-/// The mutable iterator can't produce `NodeEntryMut`, because multiple mutable
-/// references could be obtained which could lead to iterator invalidation or
-/// worse (which is of course prevented by the borrow checker).
-pub enum IterElemMut<'a, T: 'a> {
-    Leaf {
-        span: Span,
-        data: &'a mut Option<T>,
-    },
-    Inner(Span),
-}
-
-impl<'a, T> IterElemMut<'a, T> {
-    pub fn into_leaf(self) -> Option<(Span, &'a mut Option<T>)> {
-        match self {
-            IterElemMut::Leaf { span, data } => Some((span, data)),
-            _ => None,
-        }
-    }
-
-    pub fn span(&self) -> Span {
-        match *self {
-            IterElemMut::Leaf { ref span, .. } => span,
-            IterElemMut::Inner(ref span) => span,
-        }.clone()
-    }
-}
-
-
-/// An iterator over mutable references of nodes
-pub struct IterMut<'a, T: 'a> {
-    to_visit: Vec<NodeEntryMut<'a, T>>,
-}
-
-impl<'a, T: 'a> Iterator for IterMut<'a, T> {
-    type Item = IterElemMut<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.to_visit.pop().map(|next| {
-            if next.is_leaf() {
-                IterElemMut::Leaf {
-                    span: next.span(),
-                    data: next.into_leaf_data().unwrap(),
-                }
-            } else {
-                let span = next.span();
-                let children = next.into_children().unwrap();
-                self.to_visit.extend(ArrayVec::from(children));
-                IterElemMut::Inner(span)
-            }
-        })
-    }
-}
+const SPLIT_SPAN_DIFF_AMOUNT: &'static [Vector3<f32>; 8] = &[
+    Vector3 { x: 0.0, y: 0.0, z: 0.0 },
+    Vector3 { x: 0.0, y: 0.0, z: 1.0 },
+    Vector3 { x: 0.0, y: 1.0, z: 0.0 },
+    Vector3 { x: 0.0, y: 1.0, z: 1.0 },
+    Vector3 { x: 1.0, y: 0.0, z: 0.0 },
+    Vector3 { x: 1.0, y: 0.0, z: 1.0 },
+    Vector3 { x: 1.0, y: 1.0, z: 0.0 },
+    Vector3 { x: 1.0, y: 1.0, z: 1.0 },
+];
