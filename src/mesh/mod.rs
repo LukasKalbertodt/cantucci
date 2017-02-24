@@ -88,7 +88,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             // We haven't yet measured how expensive this is. If it gets too
             // slow, we might want to limit the number of `from_raw_buf()`
             // calls we can do in one `update()` call in order to avoid
-            // too high frame times.
+            // too long delays within frames.
             let mesh_view = MeshView::from_raw_buf(buf, facade)?;
             *self.tree
                 .leaf_around_mut(center)
