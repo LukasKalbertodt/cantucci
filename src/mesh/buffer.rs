@@ -19,7 +19,7 @@ implement_vertex!(Vertex, position, normal, distance_from_surface);
 pub struct MeshBuffer {
     raw_vbuf: Vec<Vertex>,
     raw_ibuf: Vec<u32>,
-    resolution: u32,
+    // resolution: u32, // TODO: use or delete
 }
 
 impl MeshBuffer {
@@ -329,7 +329,7 @@ impl MeshBuffer {
         MeshBuffer {
             raw_vbuf: raw_vbuf,
             raw_ibuf: raw_ibuf,
-            resolution: resolution,
+            // resolution: resolution,  // TODO: use or delete
         }
     }
 
@@ -341,7 +341,8 @@ impl MeshBuffer {
         &self.raw_ibuf
     }
 
-    pub fn resolution(&self) -> u32 {
-        self.resolution
-    }
+    // TODO: use or delete
+    // pub fn resolution(&self) -> u32 {
+    //     self.resolution
+    // }
 }

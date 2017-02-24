@@ -14,7 +14,7 @@ use super::renderer::Renderer;
 pub struct MeshView {
     vbuf: VertexBuffer<Vertex>,
     ibuf: IndexBuffer<u32>,
-    raw_buf: MeshBuffer,
+    // raw_buf: MeshBuffer,   // TODO: use or delete
 }
 
 impl MeshView {
@@ -27,13 +27,14 @@ impl MeshView {
         Ok(MeshView {
             vbuf: vbuf,
             ibuf: ibuf,
-            raw_buf: buf,
+            // raw_buf: buf,   // TODO: use or delete
         })
     }
 
-    pub fn raw_buf(&self) -> &MeshBuffer {
-        &self.raw_buf
-    }
+    // TODO: use or delete
+    // pub fn raw_buf(&self) -> &MeshBuffer {
+    //     &self.raw_buf
+    // }
 
     /// Draws the mesh.
     pub fn draw<S: Surface>(
