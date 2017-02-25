@@ -1,6 +1,6 @@
 use glium::backend::Facade;
 use glium::Surface;
-use glium::glutin::{Event, MouseButton, ElementState};
+use glium::glutin::{Event, MouseButton, ElementState, VirtualKeyCode};
 use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use threadpool::ThreadPool;
@@ -43,6 +43,7 @@ pub struct ShapeMesh<Sh> {
     mesh_tx: Sender<(Point3<f32>, MeshBuffer)>,
     active_jobs: u64,
     split_next_time: bool,
+    show_debug: bool,
 }
 
 impl<Sh: Shape + Clone> ShapeMesh<Sh> {
@@ -77,6 +78,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             mesh_tx: tx,
             active_jobs: 0,
             split_next_time: false,
+            show_debug: true,
         })
     }
 
@@ -175,8 +177,10 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
                 &MeshStatus::Ready(ref view) |
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
                     view.draw(surface, camera, env, &self.renderer)?;
-                    let highlight = span.contains(focus_point);
-                    self.debug_octree.draw(surface, camera, span, highlight)?;
+                    if self.show_debug {
+                        let highlight = span.contains(focus_point);
+                        self.debug_octree.draw(surface, camera, span, highlight)?;
+                    }
                 }
                 _ => (),
             }
@@ -210,6 +214,10 @@ impl<Sh: Shape> EventHandler for ShapeMesh<Sh> {
                 self.split_next_time = true;
                 return EventResponse::Continue;
             },
+            &Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::G)) => {
+                self.show_debug = !self.show_debug;
+                return EventResponse::Continue;
+            }
             _ => {}
         }
         EventResponse::NotHandled
