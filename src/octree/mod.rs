@@ -4,8 +4,10 @@ use std::ops::Range;
 use core::math::*;
 
 mod iter;
+mod debug_view;
 
 pub use self::iter::{Iter, IterElemMut, IterMut};
+pub use self::debug_view::DebugView;
 
 /// A box in three dimensional space that is represented by one octree node
 pub type Span = Range<Point3<f32>>;

@@ -9,7 +9,7 @@ use core::math::*;
 use core::Shape;
 use env::Environment;
 use errors::*;
-use octree::{Octree, SpanExt};
+use octree::{DebugView, Octree, SpanExt};
 
 mod buffer;
 mod renderer;
@@ -30,6 +30,9 @@ pub struct ShapeMesh<Sh> {
 
     /// The shape this mesh represents.
     shape: Sh,
+
+    /// Show the borders of the octree
+    debug_octree: DebugView,
 
     // The following fields are simply to manage the generation of the mesh on
     // multiple threads.
@@ -59,11 +62,13 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
         info!("Using {} threads to generate mesh", num_threads);
 
         let renderer = Renderer::new(facade, &shape)?;
+        let debug_octree = DebugView::new(facade)?;
 
         Ok(ShapeMesh {
             tree: tree,
             renderer: renderer,
             shape: shape,
+            debug_octree: debug_octree,
             thread_pool: pool,
             new_meshes: rx,
             mesh_tx: tx,
@@ -150,16 +155,21 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     ) -> Result<()> {
         // Visit each node of the tree
         // TODO: we might want visit the nodes in a different order (see #16)
-        for leaf_data in self.tree.iter().filter_map(|e| e.leaf_data()) {
+
+        let it = self.tree.iter()
+            .filter_map(|n| n.leaf_data().map(|data| (data, n.span())));
+        for (leaf_data, span) in it {
             match leaf_data {
                 // If there is a view available, render it
                 &MeshStatus::Ready(ref view) |
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
                     view.draw(surface, camera, env, &self.renderer)?;
+                    self.debug_octree.draw(surface, camera, span)?;
                 }
                 _ => (),
             }
         }
+
 
         Ok(())
     }
