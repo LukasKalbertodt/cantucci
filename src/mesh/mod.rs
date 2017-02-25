@@ -1,5 +1,6 @@
 use glium::backend::Facade;
 use glium::Surface;
+use glium::glutin::{Event, MouseButton, ElementState};
 use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use threadpool::ThreadPool;
@@ -10,6 +11,7 @@ use core::Shape;
 use env::Environment;
 use errors::*;
 use octree::{DebugView, Octree, SpanExt};
+use event::{EventHandler, EventResponse};
 
 mod buffer;
 mod renderer;
@@ -40,6 +42,7 @@ pub struct ShapeMesh<Sh> {
     new_meshes: Receiver<(Point3<f32>, MeshBuffer)>,
     mesh_tx: Sender<(Point3<f32>, MeshBuffer)>,
     active_jobs: u64,
+    split_next_time: bool,
 }
 
 impl<Sh: Shape + Clone> ShapeMesh<Sh> {
@@ -73,6 +76,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             new_meshes: rx,
             mesh_tx: tx,
             active_jobs: 0,
+            split_next_time: false,
         })
     }
 
@@ -81,7 +85,12 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     }
 
     /// Updates the mesh representing the shape.
-    pub fn update<F: Facade>(&mut self, facade: &F, _: &Camera) -> Result<()> {
+    pub fn update<F: Facade>(&mut self, facade: &F, camarero: &Camera) -> Result<()> {
+        if self.split_next_time {
+            let focus = self.get_focus(camarero);
+            self.tree.leaf_around_mut(focus).split();
+            self.split_next_time = false;
+        }
         let jobs_before = self.active_jobs;
 
         // Collect generated meshes and prepare them for rendering.
@@ -111,7 +120,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             .filter_map(|n| n.into_leaf())
             .filter(|&(_, ref leaf_data)| leaf_data.is_none());
         for (span, leaf_data) in empty_leaves {
-            const RESOLUTION: u32 = 100;
+            const RESOLUTION: u32 = 60;
 
             // Prepare values to be moved into the closure
             let tx = self.mesh_tx.clone();
@@ -156,6 +165,8 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
         // Visit each node of the tree
         // TODO: we might want visit the nodes in a different order (see #16)
 
+        let focus_point = self.get_focus(camera);
+
         let it = self.tree.iter()
             .filter_map(|n| n.leaf_data().map(|data| (data, n.span())));
         for (leaf_data, span) in it {
@@ -164,7 +175,8 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
                 &MeshStatus::Ready(ref view) |
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
                     view.draw(surface, camera, env, &self.renderer)?;
-                    self.debug_octree.draw(surface, camera, span)?;
+                    let highlight = span.contains(focus_point);
+                    self.debug_octree.draw(surface, camera, span, highlight)?;
                 }
                 _ => (),
             }
@@ -173,6 +185,36 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
 
         Ok(())
     }
+
+    // gibt den Punkt am Rand der Form zurück in der Richtung, in die wir gucken
+    pub fn get_focus(&self, camera: &Camera) -> Point3<f32> {
+        const EPSILON: f32 = 0.0001;
+
+        let mut pos = camera.position;
+        loop {
+            let distance = self.shape.distance(pos).min;
+            pos = pos + camera.direction() * distance;
+            if distance < EPSILON {
+                break;
+            }
+        }
+        pos
+    }
+}
+
+impl<Sh: Shape> EventHandler for ShapeMesh<Sh> {
+
+    fn handle_event(&mut self, e: &Event) -> EventResponse {
+        match e {
+            &Event::MouseInput(ElementState::Released, MouseButton::Left) => {
+                self.split_next_time = true;
+                return EventResponse::Continue;
+            },
+            _ => {}
+        }
+        EventResponse::NotHandled
+    }
+
 }
 
 enum MeshStatus {

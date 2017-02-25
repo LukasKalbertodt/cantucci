@@ -64,6 +64,7 @@ impl DebugView {
         surface: &mut S,
         camera: &Camera,
         span: Span,
+        highlight: bool,
     ) -> Result<()> {
         let uniforms = uniform! {
             view_matrix: camera.view_transform().to_arr(),
@@ -78,6 +79,11 @@ impl DebugView {
                 write: true,
                 test: DepthTest::IfLess,
                 .. Default::default()
+            },
+            line_width: if highlight {
+                Some(5.0)
+            } else {
+                Some(1.0)
             },
             .. DrawParameters::default()
         };
