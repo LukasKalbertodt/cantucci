@@ -1,19 +1,20 @@
-use core::Shape;
-use errors::*;
 use glium::backend::Facade;
 use glium::Program;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+use core::Shape;
+use errors::*;
+
 
 const SHADER_FOLDER: &'static str = "shader";
 
 
-pub fn load_program_with_shape<F: Facade, S: ShaderSource, Sh: Shape>(
+pub fn load_program_with_shape<F: Facade, S: ShaderSource>(
     facade: &F,
     src: S,
-    shape: &Sh
+    shape: &Shape,
 ) -> Result<Program> {
     let de_shader = shape.de_shader();
     let vert_buf = load_file(src.vert_path(), "vert")?
@@ -25,10 +26,10 @@ pub fn load_program_with_shape<F: Facade, S: ShaderSource, Sh: Shape>(
 }
 
 
-pub fn load_program<F, S>(facade: &F, src: S) -> Result<Program>
-    where F: Facade,
-          S: ShaderSource
-{
+pub fn load_program<F: Facade, S: ShaderSource>(
+    facade: &F,
+    src: S
+) -> Result<Program> {
     let vert_buf = load_file(src.vert_path(), "vert")?;
     let frag_buf = load_file(src.frag_path(), "frag")?;
 

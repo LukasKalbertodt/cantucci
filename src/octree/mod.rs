@@ -1,6 +1,11 @@
-use std::ops::Range;
-use core::math::*;
 use arrayvec::ArrayVec;
+use std::ops::Range;
+
+use core::math::*;
+
+mod iter;
+
+pub use self::iter::{Iter, IterElemMut, IterMut};
 
 /// A box in three dimensional space that is represented by one octree node
 pub type Span = Range<Point3<f32>>;
@@ -19,7 +24,7 @@ impl SpanExt for Span {
         let s = self.start;
         let e = self.end;
 
-        s.x < p.x && s.y < p.y && s.z < p.z
+        s.x <= p.x && s.y <= p.y && s.z <= p.z
             && p.x < e.x && p.y < e.y && p.z < e.z
     }
 }
@@ -27,7 +32,7 @@ impl SpanExt for Span {
 /// Recursively partitions three dimensional space into eight octants. In this
 /// simple implementation all octants have the same size.
 ///
-/// In this application it's used to save the representation of the octant in
+/// In this application it's used to store the representation of the octant in
 /// order to allow different resolutions in different parts of space.
 pub struct Octree<T> {
     span: Range<Point3<f32>>,
@@ -48,6 +53,7 @@ impl<T> Octree<T> {
         self.span.clone()
     }
 
+    /// Returns the root node immutably.
     pub fn root(&self) -> NodeEntry<T> {
         NodeEntry {
             node: &self.root,
@@ -55,6 +61,7 @@ impl<T> Octree<T> {
         }
     }
 
+    /// Returns the root node mutably.
     pub fn root_mut(&mut self) -> NodeEntryMut<T> {
         NodeEntryMut {
             span: self.span(),
@@ -62,11 +69,8 @@ impl<T> Octree<T> {
         }
     }
 
-    // pub fn leaf_around(&self) -> NodeEntry<T> {
-
-    // }
-
-    pub fn leaf_mut_around(&mut self, p: Point3<f32>) -> NodeEntryMut<T> {
+    /// Returns the leaf node which contains the point `p`.
+    pub fn leaf_around_mut(&mut self, p: Point3<f32>) -> NodeEntryMut<T> {
         let mut node = self.root_mut();
         loop {
             if node.is_leaf() {
@@ -84,14 +88,12 @@ impl<T> Octree<T> {
 
     /// Returns an iterator over *im*mutable nodes
     pub fn iter(&self) -> Iter<T> {
-        Iter {
-            to_visit: vec![
-                NodeEntry {
-                    node: &self.root,
-                    span: self.span(),
-                }
-            ]
-        }
+        Iter::new(self)
+    }
+
+    /// Returns an iterator over mutable nodes
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        IterMut::new(self)
     }
 }
 
@@ -105,8 +107,18 @@ impl<'a, T> IntoIterator for &'a Octree<T> {
     }
 }
 
+impl<'a, T> IntoIterator for &'a mut Octree<T> {
+    type Item = IterElemMut<'a, T>;
+    type IntoIter = IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
 /// One node of the octree. This type is implementation detail of the data
 /// structure and isn't usually exposed to the user.
+#[derive(Debug, PartialEq, Eq)]
 enum Octnode<T> {
     /// At this point, space is not further subdivided
     Leaf(Option<T>),
@@ -129,19 +141,10 @@ enum Octnode<T> {
 
 // ===========================================================================
 
-const SPLIT_SPAN_DIFF_AMOUNT: &'static [Vector3<f32>; 8] = &[
-    Vector3 { x: 0.0, y: 0.0, z: 0.0 },
-    Vector3 { x: 0.0, y: 0.0, z: 1.0 },
-    Vector3 { x: 0.0, y: 1.0, z: 0.0 },
-    Vector3 { x: 0.0, y: 1.0, z: 1.0 },
-    Vector3 { x: 1.0, y: 0.0, z: 0.0 },
-    Vector3 { x: 1.0, y: 0.0, z: 1.0 },
-    Vector3 { x: 1.0, y: 1.0, z: 0.0 },
-    Vector3 { x: 1.0, y: 1.0, z: 1.0 },
-];
 
 /// An *im*mutable reference to a node inside the tree that knows about its
 /// span.
+#[derive(Debug, Clone)]
 pub struct NodeEntry<'a, T: 'a> {
     node: &'a Octnode<T>,
     span: Span,
@@ -200,27 +203,10 @@ impl<'a, T> NodeEntry<'a, T> {
 
 // ===========================================================================
 
-/// An iterator over *im*mutable references of nodes
-pub struct Iter<'a, T: 'a> {
-    to_visit: Vec<NodeEntry<'a, T>>,
-}
-
-impl<'a, T: 'a> Iterator for Iter<'a, T> {
-    type Item = NodeEntry<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.to_visit.pop().map(|next| {
-            if let Some(children) = next.children() {
-                self.to_visit.extend(ArrayVec::from(children));
-            }
-            next
-        })
-    }
-}
-
 // ===========================================================================
 
 /// A *mutable* reference to a node inside the tree that knows about its span.
+#[derive(Debug)]
 pub struct NodeEntryMut<'a, T: 'a> {
     node: &'a mut Octnode<T>,
     span: Span,
@@ -243,7 +229,31 @@ impl<'a, T> NodeEntryMut<'a, T> {
 
     /// If the referenced node is a leaf node and this leaf node contains a
     /// value, that value is returned; `None` otherwise.
-    pub fn leaf_data<'b>(&'b mut self) -> Option<&'b mut Option<T>> {
+    pub fn leaf_data(&self) -> Option<&Option<T>> {
+        // Warning: you can't return `&'a` here. Don't waste time by
+        // trying! See:
+        // http://stackoverflow.com/q/42397056/2408867
+        match *self.node {
+            Octnode::Leaf(ref data) => Some(data),
+            _ => None,
+        }
+    }
+
+    /// If the referenced node is a leaf node and this leaf node contains a
+    /// value, that value is returned; `None` otherwise.
+    pub fn leaf_data_mut(&mut self) -> Option<&mut Option<T>> {
+        // Warning: you can't return `&'a mut` here. Don't waste time by
+        // trying! See:
+        // http://stackoverflow.com/q/42397056/2408867
+        match *self.node {
+            Octnode::Leaf(ref mut data) => Some(data),
+            _ => None,
+        }
+    }
+
+    /// If the referenced node is a leaf node and this leaf node contains a
+    /// value, that value is returned; `None` otherwise.
+    pub fn into_leaf_data(self) -> Option<&'a mut Option<T>> {
         match *self.node {
             Octnode::Leaf(ref mut data) => Some(data),
             _ => None,
@@ -252,7 +262,12 @@ impl<'a, T> NodeEntryMut<'a, T> {
 
     /// If the referenced node `n` is *not* a leaf node, eight `NodeEntry`s
     /// referencing all eight children of `n` are returned; `None` otherwise.
+    ///
+    /// This methods takes `self` because of borrowck limitations.
     pub fn into_children(self) -> Option<ArrayVec<[Self; 8]>> {
+        // Warning: you can't change the `self` into a `&mut self` without
+        // shortening the output lifetime! Don't waste time by trying! See:
+        // http://stackoverflow.com/q/42397056/2408867
         match *self.node {
             Octnode::SubTree(ref mut children) => {
                 let start = self.span.start;
@@ -290,8 +305,13 @@ impl<'a, T> NodeEntryMut<'a, T> {
             _ => unreachable!(),
         };
 
-        let eight_nones = iter::repeat(()).map(|_| Octnode::Leaf(None));
-        let empty_children: ArrayVec<_> = eight_nones.collect();
+        // Sadly, `Octnode` is not `Copy`, so we can't simply create the array
+        // by saying `[Leaf(None); 8]`. Therefore we generate it with this
+        // iterator thingy.
+        let empty_children: ArrayVec<_> = iter::repeat(())
+            .map(|_| Octnode::Leaf(None))
+            .take(8)
+            .collect();
 
         *self.node = Octnode::SubTree(
             Box::new(empty_children.into_inner().ok().unwrap())
@@ -300,3 +320,14 @@ impl<'a, T> NodeEntryMut<'a, T> {
         out
     }
 }
+
+const SPLIT_SPAN_DIFF_AMOUNT: &'static [Vector3<f32>; 8] = &[
+    Vector3 { x: 0.0, y: 0.0, z: 0.0 },
+    Vector3 { x: 0.0, y: 0.0, z: 1.0 },
+    Vector3 { x: 0.0, y: 1.0, z: 0.0 },
+    Vector3 { x: 0.0, y: 1.0, z: 1.0 },
+    Vector3 { x: 1.0, y: 0.0, z: 0.0 },
+    Vector3 { x: 1.0, y: 0.0, z: 1.0 },
+    Vector3 { x: 1.0, y: 1.0, z: 0.0 },
+    Vector3 { x: 1.0, y: 1.0, z: 1.0 },
+];

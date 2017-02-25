@@ -1,9 +1,10 @@
+use glium::backend::glutin_backend::GlutinFacade;
+use glium::glutin::{CursorState, Event};
+
 use camera::{Camera, Projection};
 use core::math::*;
 use core::Shape;
 use event::{EventHandler, EventResponse};
-use glium::backend::glutin_backend::GlutinFacade;
-use glium::glutin::{CursorState, Event};
 use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which the camera can fly

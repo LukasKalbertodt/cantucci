@@ -3,13 +3,13 @@ use std::io;
 
 error_chain! {
     foreign_links {
-        io::Error, Io;
+        Io(io::Error);
 
         // glium stuff
-        glium::GliumCreationError<glium::glutin::CreationError>, GliumCreation;
-        glium::ProgramCreationError, GliumProgramCreation;
-        glium::vertex::BufferCreationError, VertexBufferCreation;
-        glium::index::BufferCreationError, IndexBufferCreation;
-        glium::DrawError, DrawError;
+        GliumCreation(glium::GliumCreationError<glium::glutin::CreationError>);
+        GliumProgramCreation(glium::ProgramCreationError);
+        VertexBufferCreation(glium::vertex::BufferCreationError);
+        IndexBufferCreation(glium::index::BufferCreationError);
+        DrawError(glium::DrawError);
     }
 }

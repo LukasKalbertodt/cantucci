@@ -12,7 +12,7 @@ pub struct DistanceApprox {
     pub max: f32,
 }
 
-pub trait Shape: Send {
+pub trait Shape: Send + 'static {
     /// Returns an estimate for the distance from `p` to the closest surface
     /// point of the shape.
     ///

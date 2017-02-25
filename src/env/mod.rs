@@ -4,8 +4,9 @@
 //! The `Environment` type creates and handles all components.
 //!
 
-use errors::*;
 use glium::backend::Facade;
+
+use errors::*;
 
 /// How far the sky is from the camera. This whole environment is drawn first
 /// and doesn't use any depth test. The whole environment is invariant to

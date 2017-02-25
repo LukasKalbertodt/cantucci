@@ -1,8 +1,9 @@
+use glium::glutin::Event;
+
 use camera::{Camera, Projection};
 use core::math::*;
 use core::Shape;
 use event::{EventHandler, EventResponse};
-use glium::glutin::Event;
 use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which theta can change.
