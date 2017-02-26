@@ -51,7 +51,7 @@ pub trait Shape: Send + 'static {
     ///
     /// Similar to `min_distance_from()` this upper bound must converge to the
     /// real value as we approach the surface.
-    fn max_distance_from(&self, p: Point3<f32>) -> Option<f32> {
+    fn max_distance_from(&self, _p: Point3<f32>) -> Option<f32> {
         None
     }
 
