@@ -285,10 +285,21 @@ impl MeshBuffer {
                 let v2 = points[(x, y    , z - 1)].unwrap();
                 let v3 = points[(x, y    , z    )].unwrap();
 
-                raw_ibuf.extend_from_slice(&[
-                    v0, v1, v2,
-                    v1, v2, v3,
-                ]);
+                raw_ibuf.extend_from_slice(&
+                    // distance negative, triangle cw
+                    if dists[(x, y, z)] < 0.0 {
+                        [
+                            v0, v2, v1,
+                            v1, v2, v3,
+                        ]
+                    } else {
+                        // ccw
+                        [
+                            v0, v1, v2,
+                            v1, v3, v2,
+                        ]
+                    }
+                );
             }
 
             // Edge from the current corner pointing in +y direction
@@ -298,10 +309,21 @@ impl MeshBuffer {
                 let v2 = points[(x,     y, z - 1)].unwrap();
                 let v3 = points[(x,     y, z    )].unwrap();
 
-                raw_ibuf.extend_from_slice(&[
-                    v0, v1, v2,
-                    v1, v2, v3,
-                ]);
+                raw_ibuf.extend_from_slice(&
+                    // distance negative, triangle cw
+                    if dists[(x, y, z)] < 0.0 {
+                        [
+                            v0, v1, v2,
+                            v1, v3, v2,
+                        ]
+                    } else {
+                        // ccw
+                        [
+                            v0, v2, v1,
+                            v1, v2, v3,
+                        ]
+                    }
+                );
             }
 
             // Edge from the current corner pointing in +z direction
@@ -311,10 +333,21 @@ impl MeshBuffer {
                 let v2 = points[(x,     y - 1, z)].unwrap();
                 let v3 = points[(x,     y    , z)].unwrap();
 
-                raw_ibuf.extend_from_slice(&[
-                    v0, v1, v2,
-                    v1, v2, v3,
-                ]);
+                raw_ibuf.extend_from_slice(&
+                    // distance negative, triangle cw
+                    if dists[(x, y, z)] < 0.0 {
+                        [
+                            v0, v2, v1,
+                            v1, v2, v3,
+                        ]
+                    } else {
+                        // ccw
+                        [
+                            v0, v1, v2,
+                            v1, v3, v2,
+                        ]
+                    }
+                );
             }
         }
 
