@@ -1,7 +1,9 @@
 use math::*;
 use super::Shape;
 
-// TODO: docs
+/// Represents the 3D version of the classical mandelbulb described [here][1].
+///
+/// [1]: http://www.skytopia.com/project/fractal/mandelbulb.html
 #[derive(Clone)]
 pub struct Mandelbulb {
     power: f32,
