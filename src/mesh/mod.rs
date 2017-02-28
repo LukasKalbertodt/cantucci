@@ -89,9 +89,12 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     /// Updates the mesh representing the shape.
     pub fn update<F: Facade>(&mut self, facade: &F, camarero: &Camera) -> Result<()> {
         if self.split_next_time {
-            let focus = self.get_focus(camarero);
-            self.tree.leaf_around_mut(focus).split();
             self.split_next_time = false;
+            let node = self.get_focus(camarero)
+                .and_then(|focus| self.tree.leaf_around_mut(focus));
+            if let Some(mut node) = node {
+                node.split();
+            }
         }
         let jobs_before = self.active_jobs;
 
@@ -108,6 +111,8 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             let mesh_view = MeshView::from_raw_buf(buf, facade)?;
             *self.tree
                 .leaf_around_mut(center)
+                // we know that `center` is within the bound of the octree
+                .unwrap()
                 .leaf_data_mut()
                 .unwrap() = Some(MeshStatus::Ready(mesh_view));
         }
@@ -178,7 +183,9 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
                     view.draw(surface, camera, env, &self.renderer)?;
                     if self.show_debug {
-                        let highlight = span.contains(focus_point);
+                        let highlight = focus_point
+                            .map(|fp| span.contains(fp))
+                            .unwrap_or(false);
                         self.debug_octree.draw(surface, camera, span, highlight)?;
                     }
                 }
@@ -191,18 +198,19 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     }
 
     /// Returns the point on the shape's surface the camera is currently looking at
-    pub fn get_focus(&self, camera: &Camera) -> Point3<f32> {
+    pub fn get_focus(&self, camera: &Camera) -> Option<Point3<f32>> {
         const EPSILON: f32 = 0.000_001;
+        const MAX_ITERS: u64 = 100;
 
         let mut pos = camera.position;
-        loop {
+        for _ in 0..MAX_ITERS {
             let distance = self.shape.min_distance_from(pos);
             pos += camera.direction() * distance;
             if distance < EPSILON {
                 break;
             }
         }
-        pos
+        Some(pos)
     }
 }
 
