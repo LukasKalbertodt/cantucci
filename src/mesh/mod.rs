@@ -190,14 +190,14 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
         Ok(())
     }
 
-    // gibt den Punkt am Rand der Form zurück in der Richtung, in die wir gucken
+    /// Returns the point on the shape's surface the camera is currently looking at
     pub fn get_focus(&self, camera: &Camera) -> Point3<f32> {
-        const EPSILON: f32 = 0.0001;
+        const EPSILON: f32 = 0.000_001;
 
         let mut pos = camera.position;
         loop {
             let distance = self.shape.distance(pos).min;
-            pos = pos + camera.direction() * distance;
+            pos += camera.direction() * distance;
             if distance < EPSILON {
                 break;
             }
@@ -209,18 +209,17 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
 impl<Sh: Shape> EventHandler for ShapeMesh<Sh> {
 
     fn handle_event(&mut self, e: &Event) -> EventResponse {
-        match e {
-            &Event::MouseInput(ElementState::Released, MouseButton::Left) => {
+        match *e {
+            Event::MouseInput(ElementState::Released, MouseButton::Left) => {
                 self.split_next_time = true;
-                return EventResponse::Continue;
+                EventResponse::Continue
             },
-            &Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::G)) => {
+            Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::G)) => {
                 self.show_debug = !self.show_debug;
-                return EventResponse::Continue;
-            }
-            _ => {}
+                EventResponse::Continue
+            },
+            _ => { EventResponse::NotHandled }
         }
-        EventResponse::NotHandled
     }
 
 }
