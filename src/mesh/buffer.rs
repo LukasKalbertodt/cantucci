@@ -73,7 +73,7 @@ impl MeshBuffer {
             let v = Vector3::new(x, y, z).cast::<f32>() / (resolution as f32);
             let p = span.start + (span.end - span.start).mul_element_wise(v);
 
-            shape.distance(p).min
+            shape.min_distance_from(p)
         });
 
 
@@ -237,24 +237,24 @@ impl MeshBuffer {
 
             // Now we only calculate some meta data which might be used to
             // color the vertex.
-            let dist_p = shape.distance(p);
+            let dist_p = shape.min_distance_from(p);
 
             let normal = {
                 let delta = 0.01 * (span.end - span.start) / resolution as f32;
                 Vector3::new(
-                    shape.distance(p + Vector3::unit_x() * delta.x).min
-                        - shape.distance(p +  Vector3::unit_x() * -delta.x).min,
-                    shape.distance(p + Vector3::unit_y() * delta.y).min
-                        - shape.distance(p +  Vector3::unit_y() * -delta.y).min,
-                    shape.distance(p + Vector3::unit_z() * delta.z).min
-                        - shape.distance(p +  Vector3::unit_z() * -delta.z).min,
+                    shape.min_distance_from(p + Vector3::unit_x() * delta.x)
+                        - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
+                    shape.min_distance_from(p + Vector3::unit_y() * delta.y)
+                        - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
+                    shape.min_distance_from(p + Vector3::unit_z() * delta.z)
+                        - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
                 ).normalize()
             };
 
             raw_vbuf.push(Vertex {
                 position: p.to_vec().cast::<f32>().to_arr(),
                 normal: normal.to_arr(),
-                distance_from_surface: dist_p.min as f32,
+                distance_from_surface: dist_p,
             });
             Some(raw_vbuf.len() as u32 - 1)
         });

@@ -196,7 +196,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
 
         let mut pos = camera.position;
         loop {
-            let distance = self.shape.distance(pos).min;
+            let distance = self.shape.min_distance_from(pos);
             pos += camera.direction() * distance;
             if distance < EPSILON {
                 break;

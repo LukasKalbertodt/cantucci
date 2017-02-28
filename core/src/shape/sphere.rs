@@ -1,5 +1,5 @@
 use math::*;
-use super::{DistanceApprox, Shape};
+use super::Shape;
 
 #[derive(Clone)]
 pub struct Sphere {
@@ -22,12 +22,12 @@ impl Shape for Sphere {
         (self.center - p).magnitude2() <= (self.radius * self.radius)
     }
 
-    fn distance(&self, p: Point3<f32>) -> DistanceApprox {
-        let d = (self.center - p).magnitude() - self.radius;
-        DistanceApprox {
-            min: d,
-            max: d,
-        }
+    fn min_distance_from(&self, p: Point3<f32>) -> f32 {
+        (self.center - p).magnitude() - self.radius
+    }
+
+    fn max_distance_from(&self, p: Point3<f32>) -> Option<f32> {
+        Some(self.min_distance_from(p))
     }
 
     fn de_shader(&self) -> String {
@@ -39,4 +39,6 @@ impl Shape for Sphere {
 
         s
     }
+
+    impl_batch_methods!();
 }

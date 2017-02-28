@@ -39,7 +39,7 @@ impl App {
 
         let proj = Projection::new(
             Rad(1.0),
-            0.01 .. 20.0,
+            0.000_2 .. 10.0,
             facade.get_framebuffer_dimensions(),
         );
 
