@@ -1,6 +1,6 @@
 use glium::backend::Facade;
 use glium::Surface;
-use glium::glutin::{Event, MouseButton, ElementState, VirtualKeyCode};
+use glium::glutin::{Event, ElementState, VirtualKeyCode};
 use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use threadpool::ThreadPool;
@@ -87,15 +87,28 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     }
 
     /// Updates the mesh representing the shape.
-    pub fn update<F: Facade>(&mut self, facade: &F, camarero: &Camera) -> Result<()> {
-        if self.split_next_time {
-            self.split_next_time = false;
-            let node = self.get_focus(camarero)
-                .and_then(|focus| self.tree.leaf_around_mut(focus));
-            if let Some(mut node) = node {
-                node.split();
+    pub fn update<F: Facade>(&mut self, facade: &F, camarero: &Camera) -> Result<()> {     
+        // increase resolution dynamically
+        if let Some(focus) = self.get_focus(camarero) {
+            if let Some(mut leaf) = self.tree.leaf_around_mut(focus) {
+                let dist = camarero.position.distance(focus);
+                let span = leaf.span();
+                let threshold = 2.0 * (span.end.x - span.start.x).abs();
+
+                // if we are near enough to the surface, increase resolution
+                if dist < threshold {
+                    leaf.split();
+                }
             }
         }
+
+        // old version: split on click
+        // if self.split_next_time {
+        //     let focus = self.get_focus(camarero);
+        //     self.tree.leaf_around_mut(focus).split();
+        //     self.split_next_time = false;
+        // }
+        
         let jobs_before = self.active_jobs;
 
         // Collect generated meshes and prepare them for rendering.
@@ -218,10 +231,10 @@ impl<Sh: Shape> EventHandler for ShapeMesh<Sh> {
 
     fn handle_event(&mut self, e: &Event) -> EventResponse {
         match *e {
-            Event::MouseInput(ElementState::Released, MouseButton::Left) => {
-                self.split_next_time = true;
-                EventResponse::Continue
-            },
+            // Event::MouseInput(ElementState::Released, MouseButton::Left) => {
+            //     self.split_next_time = true;
+            //     EventResponse::Continue
+            // },
             Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::G)) => {
                 self.show_debug = !self.show_debug;
                 EventResponse::Continue
