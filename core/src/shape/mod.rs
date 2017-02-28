@@ -1,10 +1,12 @@
 use math::*;
 
-mod sphere;
+#[macro_use]
+mod util;
 mod mandelbulb;
+mod sphere;
 
-pub use self::sphere::Sphere;
 pub use self::mandelbulb::Mandelbulb;
+pub use self::sphere::Sphere;
 
 /// Describes a 3D object that can be rendered by this application.
 ///
@@ -70,4 +72,28 @@ pub trait Shape: Send + 'static {
     fn contains(&self, p: Point3<f32>) -> bool {
         self.min_distance_from(p) < 0.0
     }
+
+    /// Calls `min_distance_from()` for each given point and returns the
+    /// results as vector. This is for use through a trait object to reduce
+    /// the virtual call overhead.
+    ///
+    /// This method and the other two `batch_` methods should be implemented
+    /// by using the `impl_batch_methods` macro, if it's not possible to
+    /// improve performance by writing a custom implementation.
+    fn batch_min_distance_from(&self, points: &[Point3<f32>]) -> Vec<f32>;
+
+    /// Calls `max_distance_from()` for each given point and returns the
+    /// results as vector. See `batch_min_distance_from()` for more
+    /// information.
+    ///
+    /// This will panic when `max_distance_from()` returns `None`.
+    fn batch_max_distance_from(&self, points: &[Point3<f32>]) -> Vec<f32>;
+
+    /// Calls `bounded_distance_from()` for each given point and returns the
+    /// results as vector. See `batch_min_distance_from()` for more
+    /// information.
+    ///
+    /// This will panic when `max_distance_from()` returns `None`.
+    fn batch_bounded_distance_from(&self, points: &[Point3<f32>]) -> Vec<(f32, f32)>;
+
 }

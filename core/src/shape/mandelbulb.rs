@@ -70,6 +70,8 @@ impl Shape for Mandelbulb {
 
         s
     }
+
+    impl_batch_methods!();
 }
 
 fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {

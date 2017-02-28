@@ -39,4 +39,6 @@ impl Shape for Sphere {
 
         s
     }
+
+    impl_batch_methods!();
 }
