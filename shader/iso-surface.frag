@@ -65,6 +65,8 @@ void main() {
     }
 
     color = vec4(out_color, 1);
+    // FARBE AENDERN
+    color = vec4(world_normal/2 + 0.4, 1);
 
 
 

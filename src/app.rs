@@ -33,7 +33,7 @@ impl App {
         let facade = create_context()
             .chain_err(|| "failed to create GL context")?;
 
-        let shape = Mandelbulb::classic(3, 2.5);
+        let shape = Mandelbulb::classic(6, 2.5);
         // let shape = Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0);
         let mesh = ShapeMesh::new(&facade, shape)?;
 
@@ -137,6 +137,7 @@ impl App {
 
         let out = poll_events_with(&self.facade, &mut [
             self.control.as_event_handler(),
+            &mut self.mesh,
             &mut QuitHandler,
             &mut |e: &Event| {
                 if let Event::Resized(w, h) = *e {

@@ -134,9 +134,11 @@ impl EventHandler for Orbit {
                     => self.phi_accel -= Rad(1.0),
 
                 // Update zoom speed
-                (Released, Vkc::Add) | (Pressed, Vkc::Subtract) if self.zoom_speed <= 0.0
+                (Released, Vkc::Add) | (Pressed, Vkc::Subtract) |
+                (Released, Vkc::Equals) | (Pressed, Vkc::Minus) if self.zoom_speed <= 0.0
                     => self.zoom_speed += ZOOM_SPEED,
-                (Pressed, Vkc::Add) | (Released, Vkc::Subtract) if self.zoom_speed >= 0.0
+                (Pressed, Vkc::Add) | (Released, Vkc::Subtract) |
+                (Pressed, Vkc::Equals) | (Released, Vkc::Minus) if self.zoom_speed >= 0.0
                     => self.zoom_speed -= ZOOM_SPEED,
 
                 _ => return EventResponse::NotHandled,

@@ -101,7 +101,7 @@ impl CamControl for Fly {
         trace!("distance: {} (from {:?})", shape.distance(self.cam.position).min, self.cam.position);
 
         let distance_multiplier = clamp(
-            2.0 * shape.distance(self.cam.position).min,
+            2.0 * shape.distance(self.cam.position).min.abs(),
             0.0,
             2.0
         );
