@@ -78,36 +78,36 @@ fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {
     // For some integer powers there are formulas without trigonometric
     // functions. This improves performance... maybe.
     match power {
-        8.0 => {
-            let Point3 { x, y, z } = p;
-            let rxy2 = x.powf(2.0) + y.powf(2.0);
-            let a = 1.0 + (
-                z.powf(8.0)
-                - 28.0 * z.powf(6.0) * rxy2.powf(1.0)
-                + 70.0 * z.powf(4.0) * rxy2.powf(2.0)
-                - 28.0 * z.powf(2.0) * rxy2.powf(3.0)
-            ) / rxy2.powf(4.0);
+        // 8.0 => {
+        //     let Point3 { x, y, z } = p;
+        //     let rxy2 = x.powf(2.0) + y.powf(2.0);
+        //     let a = 1.0 + (
+        //         z.powf(8.0)
+        //         - 28.0 * z.powf(6.0) * rxy2.powf(1.0)
+        //         + 70.0 * z.powf(4.0) * rxy2.powf(2.0)
+        //         - 28.0 * z.powf(2.0) * rxy2.powf(3.0)
+        //     ) / rxy2.powf(4.0);
 
-            Point3 {
-                x: a * (
-                    x.powf(8.0)
-                    - 28.0 * x.powf(6.0) * y.powf(2.0)
-                    + 70.0 * x.powf(4.0) * y.powf(4.0)
-                    - 28.0 * x.powf(2.0) * y.powf(6.0)
-                    - y.powf(8.0)
-                ),
-                y: 8.0 * a * x * y * (
-                    x.powf(6.0)
-                    - 7.0 * x.powf(4.0) * y.powf(2.0)
-                    + 7.0 * x.powf(2.0) * y.powf(4.0)
-                    - y.powf(6.0)
-                ),
-                z: 8.0 * z
-                    * rxy2.sqrt()
-                    * (z.powf(2.0) - rxy2)
-                    * (z.powf(4.0) - 6.0 * z.powf(2.0) * rxy2 + rxy2.powf(2.0)),
-            }
-        }
+        //     Point3 {
+        //         x: a * (
+        //             x.powf(8.0)
+        //             - 28.0 * x.powf(6.0) * y.powf(2.0)
+        //             + 70.0 * x.powf(4.0) * y.powf(4.0)
+        //             - 28.0 * x.powf(2.0) * y.powf(6.0)
+        //             - y.powf(8.0)
+        //         ),
+        //         y: 8.0 * a * x * y * (
+        //             x.powf(6.0)
+        //             - 7.0 * x.powf(4.0) * y.powf(2.0)
+        //             + 7.0 * x.powf(2.0) * y.powf(4.0)
+        //             - y.powf(6.0)
+        //         ),
+        //         z: 8.0 * z
+        //             * rxy2.sqrt()
+        //             * (z.powf(2.0) - rxy2)
+        //             * (z.powf(4.0) - 6.0 * z.powf(2.0) * rxy2 + rxy2.powf(2.0)),
+        //     }
+        // }
         _ => {
             let old_radius = (p - CENTER).magnitude();
 
