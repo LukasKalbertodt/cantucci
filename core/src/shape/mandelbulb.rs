@@ -76,6 +76,9 @@ impl Shape for Mandelbulb {
     impl_batch_methods!();
 }
 
+/// This operation rotates the point as triplex number. This is equivalent to
+/// the squaring in the original 2D mandelbrot. First we convert the point
+/// to spherical coordinates, then we rotate and convert them back.
 fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {
     // For some integer powers there are formulas without trigonometric
     // functions. This improves performance... maybe.
