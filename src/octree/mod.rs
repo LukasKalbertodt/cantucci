@@ -72,11 +72,14 @@ impl<T> Octree<T> {
     }
 
     /// Returns the leaf node which contains the point `p`.
-    pub fn leaf_around_mut(&mut self, p: Point3<f32>) -> NodeEntryMut<T> {
+    pub fn leaf_around_mut(&mut self, p: Point3<f32>) -> Option<NodeEntryMut<T>> {
         let mut node = self.root_mut();
+        if !node.span().contains(p) {
+            return None;
+        }
         loop {
             if node.is_leaf() {
-                return node;
+                return Some(node);
             } else {
                 node = node
                     .into_children()
