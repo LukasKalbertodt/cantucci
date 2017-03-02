@@ -3,7 +3,16 @@ rust:
   - stable
   - beta
   - nightly
+
 matrix:
   allow_failures:
     - rust: nightly
+
+script:
+  - ci/run-all.sh
+
+# speeds up travis build (I guess)
+git:
+  depth: 1
+
 cache: cargo
