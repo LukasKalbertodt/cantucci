@@ -1,9 +1,12 @@
+use std::time::Instant;
+
 use core::math::*;
 use core::Shape;
 use octree::Span;
 use util::ToArr;
 use util::iter::cube;
 use util::grid::GridTable;
+use util::time::DurationExt;
 
 
 #[derive(Copy, Clone)]
@@ -61,7 +64,7 @@ impl MeshBuffer {
             span.start + -overflow .. span.end + overflow
         };
 
-        trace!("Starting to generate in {:?} @ {} res", span, resolution);
+        let before_first = Instant::now();
 
         // First Step:
         // ===========
@@ -75,6 +78,8 @@ impl MeshBuffer {
 
             shape.min_distance_from(p)
         });
+
+        let before_second = Instant::now();
 
 
         // Second Step:
@@ -259,6 +264,9 @@ impl MeshBuffer {
             Some(raw_vbuf.len() as u32 - 1)
         });
 
+        let before_third = Instant::now();
+
+
         // Third step:
         // ===========
         //
@@ -318,12 +326,17 @@ impl MeshBuffer {
             }
         }
 
+        let after_third = Instant::now();
+
+
         trace!(
-            "Generated {} points/{} triangles in box ({:?}) @ {} res",
+            "Generated {:5} points, {:5} triangles in {:9} ({:9}, {:9}, {:9})",
             raw_vbuf.len(),
             raw_ibuf.len() / 3,
-            span,
-            resolution,
+            (after_third - before_first).display_ms(),
+            (before_second - before_first).display_ms(),
+            (before_third - before_second).display_ms(),
+            (after_third - before_third).display_ms(),
         );
 
         MeshBuffer {
@@ -346,3 +359,60 @@ impl MeshBuffer {
     //     self.resolution
     // }
 }
+
+
+
+
+// mod benchi {
+//     extern crate test;
+
+//     use self::test::Bencher;
+//     use super::*;
+//     use core::shape::Mandelbulb;
+
+//     #[bench]
+//     fn bench_mandelbulb_10(b: &mut Bencher) {
+//         let shape = Mandelbulb::classic(5, 2.5);
+//         b.iter(|| MeshBuffer::generate_for_box(
+//             &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//             &shape,
+//             10,
+//         ))
+//     }
+
+//     // #[bench]
+//     // fn bench_mandelbulb_25(b: &mut Bencher) {
+//     //     let shape = Mandelbulb::classic(5, 2.5);
+//     //     b.iter(|| MeshBuffer::generate_for_box(
+//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//     //         &shape,
+//     //         25,
+//     //     ))
+//     // }
+
+//     // #[bench]
+//     // fn bench_mandelbulb_50(b: &mut Bencher) {
+//     //     let shape = Mandelbulb::classic(5, 2.5);
+//     //     b.iter(|| MeshBuffer::generate_for_box(
+//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//     //         &shape,
+//     //         50,
+//     //     ))
+//     // }
+
+//     #[bench]
+//     fn classic_5(b: &mut Bencher) {
+//         let shape = Mandelbulb::classic(5, 2.5);
+//         let points = [
+//             Point3::new(0.0, 0.0, 0.0),
+//             Point3::new(1.0, 0.0, 0.0),
+//             Point3::new(0.0, 1.0, 0.0),
+//             Point3::new(0.0, 0.0, 1.0),
+//             Point3::new(0.3, 0.3, 0.4),
+//         ];
+
+//         b.iter(|| {
+//             points.iter().map(|&p| shape.min_distance_from(p)).sum::<f32>()
+//         })
+//     }
+// }

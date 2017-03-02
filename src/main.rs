@@ -1,6 +1,10 @@
 // We apparently need this for `error-chain`
 #![recursion_limit = "1024"]
 
+// We just need this for benchmarks. Feel free to delete this line in case
+// I forget to.
+// #![feature(test)]
+
 #[macro_use] extern crate error_chain;
 #[macro_use] extern crate glium;
 #[macro_use] extern crate log;
