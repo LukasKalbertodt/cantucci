@@ -363,40 +363,56 @@ impl MeshBuffer {
 
 
 
-mod benchi {
-    extern crate test;
+// mod benchi {
+//     extern crate test;
 
-    use self::test::Bencher;
-    use super::*;
-    use core::shape::Mandelbulb;
+//     use self::test::Bencher;
+//     use super::*;
+//     use core::shape::Mandelbulb;
 
-    #[bench]
-    fn bench_mandelbulb_10(b: &mut Bencher) {
-        let shape = Mandelbulb::classic(5, 2.5);
-        b.iter(|| MeshBuffer::generate_for_box(
-            &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-            &shape,
-            10,
-        ))
-    }
+//     #[bench]
+//     fn bench_mandelbulb_10(b: &mut Bencher) {
+//         let shape = Mandelbulb::classic(5, 2.5);
+//         b.iter(|| MeshBuffer::generate_for_box(
+//             &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//             &shape,
+//             10,
+//         ))
+//     }
 
-    #[bench]
-    fn bench_mandelbulb_25(b: &mut Bencher) {
-        let shape = Mandelbulb::classic(5, 2.5);
-        b.iter(|| MeshBuffer::generate_for_box(
-            &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-            &shape,
-            25,
-        ))
-    }
+//     // #[bench]
+//     // fn bench_mandelbulb_25(b: &mut Bencher) {
+//     //     let shape = Mandelbulb::classic(5, 2.5);
+//     //     b.iter(|| MeshBuffer::generate_for_box(
+//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//     //         &shape,
+//     //         25,
+//     //     ))
+//     // }
 
-    #[bench]
-    fn bench_mandelbulb_50(b: &mut Bencher) {
-        let shape = Mandelbulb::classic(5, 2.5);
-        b.iter(|| MeshBuffer::generate_for_box(
-            &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-            &shape,
-            50,
-        ))
-    }
-}
+//     // #[bench]
+//     // fn bench_mandelbulb_50(b: &mut Bencher) {
+//     //     let shape = Mandelbulb::classic(5, 2.5);
+//     //     b.iter(|| MeshBuffer::generate_for_box(
+//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//     //         &shape,
+//     //         50,
+//     //     ))
+//     // }
+
+//     #[bench]
+//     fn classic_5(b: &mut Bencher) {
+//         let shape = Mandelbulb::classic(5, 2.5);
+//         let points = [
+//             Point3::new(0.0, 0.0, 0.0),
+//             Point3::new(1.0, 0.0, 0.0),
+//             Point3::new(0.0, 1.0, 0.0),
+//             Point3::new(0.0, 0.0, 1.0),
+//             Point3::new(0.3, 0.3, 0.4),
+//         ];
+
+//         b.iter(|| {
+//             points.iter().map(|&p| shape.min_distance_from(p)).sum::<f32>()
+//         })
+//     }
+// }
