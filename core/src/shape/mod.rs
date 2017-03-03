@@ -17,7 +17,7 @@ pub use self::sphere::Sphere;
 /// the so called distance estimator (DE). This function returns an
 /// approximation of the distance from a given point to the surface of the
 /// mesh. See `min_distance_from()` for more information.
-pub trait Shape: Send + 'static {
+pub trait Shape: Sync + Send + 'static {
     /// Returns a lower bound of the distance from `p` to the closest surface
     /// point of the shape.
     ///

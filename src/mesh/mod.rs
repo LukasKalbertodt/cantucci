@@ -3,6 +3,7 @@ use glium::Surface;
 use glium::glutin::{Event, MouseButton, ElementState, VirtualKeyCode};
 use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 use threadpool::ThreadPool;
 
 use camera::Camera;
@@ -23,7 +24,7 @@ use self::renderer::Renderer;
 
 /// Type to manage the graphical representation of the shape. It updates the
 /// internal data depending on the camera position and resolution.
-pub struct ShapeMesh<Sh> {
+pub struct ShapeMesh {
     /// This octree holds the whole mesh.
     tree: Octree<MeshStatus>,
 
@@ -31,7 +32,7 @@ pub struct ShapeMesh<Sh> {
     renderer: Renderer,
 
     /// The shape this mesh represents.
-    shape: Sh,
+    shape: Arc<Shape>,
 
     /// Show the borders of the octree
     debug_octree: DebugView,
@@ -46,11 +47,12 @@ pub struct ShapeMesh<Sh> {
     show_debug: bool,
 }
 
-impl<Sh: Shape + Clone> ShapeMesh<Sh> {
-    pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
+impl ShapeMesh {
+    pub fn new<F: Facade>(facade: &F, shape: Arc<Shape>) -> Result<Self> {
         // Setup an empty tree and split the first two levels which results in
         // 8² = 64 children
         let mut tree = Octree::spanning(
+            // TODO: let the shape tell us the bounding box
             Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
         );
         let _ = tree.root_mut().split();
@@ -65,7 +67,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
         let pool = ThreadPool::new(num_threads);
         info!("Using {} threads to generate mesh", num_threads);
 
-        let renderer = Renderer::new(facade, &shape)?;
+        let renderer = Renderer::new(facade, &*shape)?;
         let debug_octree = DebugView::new(facade)?;
 
         Ok(ShapeMesh {
@@ -82,8 +84,8 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
         })
     }
 
-    pub fn shape(&self) -> &Sh {
-        &self.shape
+    pub fn shape(&self) -> &Shape {
+        &*self.shape
     }
 
     /// Updates the mesh representing the shape.
@@ -135,7 +137,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
 
             // Generate the raw buffers on another thread
             self.thread_pool.execute(move || {
-                let buf = MeshBuffer::generate_for_box(&span, &shape, RESOLUTION);
+                let buf = MeshBuffer::generate_for_box(&span, &*shape, RESOLUTION);
                 tx.send((span.center(), buf))
                     .expect("main thread has hung up, my work was for nothing! :-(");
             });
@@ -214,7 +216,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     }
 }
 
-impl<Sh: Shape> EventHandler for ShapeMesh<Sh> {
+impl EventHandler for ShapeMesh {
 
     fn handle_event(&mut self, e: &Event) -> EventResponse {
         match *e {

@@ -26,9 +26,9 @@ pub struct MeshBuffer {
 }
 
 impl MeshBuffer {
-    pub fn generate_for_box<S: Shape>(
+    pub fn generate_for_box(
         span: &Span,
-        shape: &S,
+        shape: &Shape,
         resolution: u32,
     ) -> Self {
         assert!(span.start.x < span.end.x);
@@ -53,9 +53,9 @@ impl MeshBuffer {
     /// as it preserves sharp features of the shape (see #2).
     ///
     /// [1]: https://0fps.net/2012/07/12/smooth-voxel-terrain-part-2/
-    fn naive_surface_nets<S: Shape>(
+    fn naive_surface_nets(
         span: &Span,
-        shape: &S,
+        shape: &Shape,
         resolution: u32,
     ) -> Self {
         // Adjust span to avoid holes in between two boxes
