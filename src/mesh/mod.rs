@@ -26,7 +26,7 @@ use self::renderer::Renderer;
 /// internal data depending on the camera position and resolution.
 pub struct ShapeMesh {
     /// This octree holds the whole mesh.
-    tree: Octree<MeshStatus>,
+    tree: Octree<MeshStatus, ()>,
 
     /// Holds global data (like the OpenGL program) to render the mesh.
     renderer: Renderer,
@@ -55,9 +55,9 @@ impl ShapeMesh {
             // TODO: let the shape tell us the bounding box
             Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
         );
-        let _ = tree.root_mut().split();
+        let _ = tree.root_mut().split(None);
         for mut child in tree.root_mut().into_children().unwrap() {
-            child.split();
+            child.split(None);
         }
 
         // Prepare channels and thread pool to generate the mesh on all CPU
@@ -95,7 +95,7 @@ impl ShapeMesh {
             let node = self.get_focus(camarero)
                 .and_then(|focus| self.tree.leaf_around_mut(focus));
             if let Some(mut node) = node {
-                node.split();
+                node.split(None);
             }
         }
         let jobs_before = self.active_jobs;
@@ -129,7 +129,7 @@ impl ShapeMesh {
             .filter_map(|n| n.into_leaf())
             .filter(|&(_, ref leaf_data)| leaf_data.is_none());
         for (span, leaf_data) in empty_leaves {
-            const RESOLUTION: u32 = 60;
+            const RESOLUTION: u32 = 64;
 
             // Prepare values to be moved into the closure
             let tx = self.mesh_tx.clone();
