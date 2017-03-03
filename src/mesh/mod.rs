@@ -18,7 +18,7 @@ mod buffer;
 mod renderer;
 mod view;
 
-use self::buffer::MeshBuffer;
+use self::buffer::{MeshBuffer, Timings};
 use self::view::MeshView;
 use self::renderer::Renderer;
 
@@ -40,11 +40,15 @@ pub struct ShapeMesh {
     // The following fields are simply to manage the generation of the mesh on
     // multiple threads.
     thread_pool: ThreadPool,
-    new_meshes: Receiver<(Point3<f32>, MeshBuffer)>,
-    mesh_tx: Sender<(Point3<f32>, MeshBuffer)>,
+    new_meshes: Receiver<(Point3<f32>, (MeshBuffer, Timings))>,
+    mesh_tx: Sender<(Point3<f32>, (MeshBuffer, Timings))>,
     active_jobs: u64,
     split_next_time: bool,
     show_debug: bool,
+
+    // These are just for debugging/time measuring purposes
+    batch_timings: Timings,
+    finished_jobs: u64,
 }
 
 impl ShapeMesh {
@@ -81,6 +85,8 @@ impl ShapeMesh {
             active_jobs: 0,
             split_next_time: false,
             show_debug: true,
+            batch_timings: Timings::default(),
+            finished_jobs: 0,
         })
     }
 
@@ -101,8 +107,10 @@ impl ShapeMesh {
         let jobs_before = self.active_jobs;
 
         // Collect generated meshes and prepare them for rendering.
-        for (center, buf) in self.new_meshes.try_iter() {
+        for (center, (buf, timings)) in self.new_meshes.try_iter() {
             self.active_jobs -= 1;
+            self.finished_jobs += 1;
+            self.batch_timings = self.batch_timings + timings;
 
             // Create OpenGL view from raw buffer and save it in the
             // tree.
@@ -159,6 +167,17 @@ impl ShapeMesh {
 
         if jobs_before != self.active_jobs {
             trace!("Currently active sample jobs: {}", self.active_jobs);
+
+            const PRINT_EVERY_FINISHED_JOBS: u64 = 64;
+            if self.finished_jobs % PRINT_EVERY_FINISHED_JOBS == 0 && self.finished_jobs > 0 {
+                debug!(
+                    "Finished {} new jobs in: {}",
+                    PRINT_EVERY_FINISHED_JOBS,
+                    self.batch_timings,
+                );
+                // TODO: reset timings
+                self.batch_timings = Timings::default();
+            }
         }
 
         Ok(())

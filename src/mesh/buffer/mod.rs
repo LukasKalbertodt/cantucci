@@ -1,4 +1,6 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use std::fmt;
+use std::ops;
 
 use core::math::*;
 use core::Shape;
@@ -7,6 +9,10 @@ use util::ToArr;
 use util::iter::cube;
 use util::grid::GridTable;
 use util::time::DurationExt;
+
+// mod dist_map;
+
+// use self::dist_map::DistMap;
 
 
 #[derive(Copy, Clone)]
@@ -17,6 +23,38 @@ pub struct Vertex {
 }
 
 implement_vertex!(Vertex, position, normal, distance_from_surface);
+
+#[derive(Default, Clone, Copy)]
+pub struct Timings {
+    first: Duration,
+    second: Duration,
+    third: Duration,
+}
+
+impl fmt::Display for Timings {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let all = self.first + self.second + self.third;
+        write!(
+            f,
+            "{:>11} ({:>11}, {:>11}, {:>11})",
+            all.display_ms(),
+            self.first.display_ms(),
+            self.second.display_ms(),
+            self.third.display_ms(),
+        )
+    }
+}
+
+impl ops::Add for Timings {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Timings {
+            first: self.first + other.first,
+            second: self.second + other.second,
+            third: self.third + other.third,
+        }
+    }
+}
 
 
 pub struct MeshBuffer {
@@ -30,11 +68,12 @@ impl MeshBuffer {
         span: &Span,
         shape: &Shape,
         resolution: u32,
-    ) -> Self {
+    ) -> (Self, Timings) {
         assert!(span.start.x < span.end.x);
         assert!(span.start.y < span.end.y);
         assert!(span.start.z < span.end.z);
         assert!(resolution != 0);
+        assert!(resolution.is_power_of_two());
 
         Self::naive_surface_nets(span, shape, resolution)
     }
@@ -57,7 +96,7 @@ impl MeshBuffer {
         span: &Span,
         shape: &Shape,
         resolution: u32,
-    ) -> Self {
+    ) -> (Self, Timings) {
         // Adjust span to avoid holes in between two boxes
         let span = {
             let overflow = (span.end - span.start) / resolution as f32;
@@ -243,17 +282,19 @@ impl MeshBuffer {
             // Now we only calculate some meta data which might be used to
             // color the vertex.
             let dist_p = shape.min_distance_from(p);
+            let dist_p = 0.0;
 
             let normal = {
-                let delta = 0.01 * (span.end - span.start) / resolution as f32;
-                Vector3::new(
-                    shape.min_distance_from(p + Vector3::unit_x() * delta.x)
-                        - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
-                    shape.min_distance_from(p + Vector3::unit_y() * delta.y)
-                        - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
-                    shape.min_distance_from(p + Vector3::unit_z() * delta.z)
-                        - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
-                ).normalize()
+                // let delta = 0.01 * (span.end - span.start) / resolution as f32;
+                // Vector3::new(
+                //     shape.min_distance_from(p + Vector3::unit_x() * delta.x)
+                //         - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
+                //     shape.min_distance_from(p + Vector3::unit_y() * delta.y)
+                //         - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
+                //     shape.min_distance_from(p + Vector3::unit_z() * delta.z)
+                //         - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
+                // ).normalize()
+                Vector3::new(1.0, 0.0, 0.0)
             };
 
             raw_vbuf.push(Vertex {
@@ -327,23 +368,27 @@ impl MeshBuffer {
         }
 
         let after_third = Instant::now();
-
+        let timings = Timings {
+            first: before_second - before_first,
+            second: before_third - before_second,
+            third: after_third -  before_third,
+        };
 
         trace!(
-            "Generated {:5} points, {:5} triangles in {:9} ({:9}, {:9}, {:9})",
+            "Generated {:5} points, {:5} triangles in {}",
             raw_vbuf.len(),
             raw_ibuf.len() / 3,
-            (after_third - before_first).display_ms(),
-            (before_second - before_first).display_ms(),
-            (before_third - before_second).display_ms(),
-            (after_third - before_third).display_ms(),
+            timings,
         );
 
-        MeshBuffer {
-            raw_vbuf: raw_vbuf,
-            raw_ibuf: raw_ibuf,
-            // resolution: resolution,  // TODO: use or delete
-        }
+        (
+            MeshBuffer {
+                raw_vbuf: raw_vbuf,
+                raw_ibuf: raw_ibuf,
+                // resolution: resolution,  // TODO: use or delete
+            },
+            timings
+        )
     }
 
     pub fn raw_vbuf(&self) -> &[Vertex] {
