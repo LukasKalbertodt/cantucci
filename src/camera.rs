@@ -86,6 +86,70 @@ impl Camera {
     pub fn proj_transform(&self) -> Matrix4<f32> {
         self.projection.transformation_matrix()
     }
+
+    /// returns the top left and bottom right bounding box points of the 
+    /// (projected) near plane
+    // TODO: give new name that says what this thing actually does
+    pub fn get_near_plane_bb(&self) -> Vec<Point3<f32>> {
+
+        let mut vec = Vec::new();
+
+        let frustum_height = self.projection.get_height_of_near_plane();
+        let frustum_width = self.projection.get_width_of_near_plane();
+        let inv_view_transform = self.view_transform().invert().unwrap();
+
+        // top left
+        // let top_left = Point3::new(-frustum_width/2.0, frustum_height/2.0, -self.projection.near_plane);
+        // let proj_top_left = inv_view_transform * top_left.to_homogeneous();
+        // vec.push(Point3::from_homogeneous(proj_top_left));
+
+        // println!("Erstellter   Top-Left: {:?}", top_left);
+        // println!("Projizierter Top-Left: {:?}", proj_top_left);
+        // println!("Camera Position:       {:?}", self.position);
+        // println!("Camera Direction:      {:?}", self.direction);
+        // let proj_2_top_left = Point3::from_homogeneous(self.projection.transformation_matrix() * top_left.to_homogeneous());
+        // println!("Projizierter2 Top-Left: {:?}", proj_2_top_left);
+        // println!("frustum_width:  {}", frustum_width);
+        // println!("frustum_height: {}", frustum_height);
+
+        // bottom right
+        // let bottom_right = Point3::new( frustum_width/2.0,  -frustum_height/2.0, -self.projection.near_plane);
+        // let proj_bottom_right = inv_view_transform * bottom_right.to_homogeneous();
+        // vec.push(Point3::from_homogeneous(proj_bottom_right));
+
+        // 0
+        let point = inv_view_transform * Point3::new(-2.0/6.0*frustum_width, 2.0/6.0*frustum_height, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // 1
+        let point = inv_view_transform * Point3::new(0.0, 2.0/6.0*frustum_height, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // 2
+        let point = inv_view_transform * Point3::new(2.0/6.0*frustum_width, 2.0/6.0*frustum_height, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // 3
+        let point = inv_view_transform * Point3::new(-2.0/6.0*frustum_width, 0.0, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // 4
+        let point = inv_view_transform * Point3::new(0.0, 0.0, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // 5
+        let point = inv_view_transform * Point3::new(2.0/6.0*frustum_width, 0.0, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // 6
+        let point = inv_view_transform * Point3::new(-2.0/6.0*frustum_width, -2.0/6.0*frustum_height, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // 7
+        let point = inv_view_transform * Point3::new(0.0, -2.0/6.0*frustum_height, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // 8
+        let point = inv_view_transform * Point3::new(2.0/6.0*frustum_width, -2.0/6.0*frustum_height, -self.projection.near_plane).to_homogeneous();
+        vec.push(Point3::from_homogeneous(point));
+        // let proj_2_bottom_right = Point3::from_homogeneous(self.projection.transformation_matrix() * bottom_right.to_homogeneous());
+        // println!("Projizierter2 Bottom-right: {:?}", proj_2_bottom_right);
+        
+        vec
+
+    }
 }
 
 /// Represents a specific projection that can be transformed by the selected
@@ -162,4 +226,14 @@ impl Projection {
             self.far_plane,
         )
     }
+
+    pub fn get_height_of_near_plane(&self) -> f32 {
+        2.0 * self.near_plane * (self.fov * 0.5).tan()
+    }
+
+    pub fn get_width_of_near_plane(&self) -> f32 {
+        self.get_height_of_near_plane() * self.aspect_ratio
+    }
+
+
 }
