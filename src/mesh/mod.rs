@@ -14,7 +14,7 @@ use errors::*;
 use octree::{DebugView, Octree, SpanExt};
 use event::{EventHandler, EventResponse};
 
-mod buffer;
+pub mod buffer;
 mod renderer;
 mod view;
 

@@ -10,9 +10,9 @@ use util::iter::cube;
 use util::grid::GridTable;
 use util::time::DurationExt;
 
-// mod dist_map;
+mod dist_map;
 
-// use self::dist_map::DistMap;
+use self::dist_map::DistMap;
 
 
 #[derive(Copy, Clone)]
@@ -99,7 +99,7 @@ impl MeshBuffer {
     ) -> (Self, Timings) {
         // Adjust span to avoid holes in between two boxes
         let span = {
-            let overflow = (span.end - span.start) / resolution as f32;
+            let overflow = (span.end - span.start) / (resolution - 1) as f32;
             span.start + -overflow .. span.end + overflow
         };
 
@@ -111,12 +111,14 @@ impl MeshBuffer {
         // We partition our box into regular cells. For each corner in between
         // the cells we calculate and save the estimated minimal distance from
         // the shape.
-        let dists = GridTable::fill_with(resolution + 1, |x, y, z| {
-            let v = Vector3::new(x, y, z).cast::<f32>() / (resolution as f32);
-            let p = span.start + (span.end - span.start).mul_element_wise(v);
+        // let dists = GridTable::fill_with(resolution, |x, y, z| {
+        //     let v = Vector3::new(x, y, z).cast::<f32>() / (resolution as f32);
+        //     let p = span.start + (span.end - span.start).mul_element_wise(v);
 
-            shape.min_distance_from(p)
-        });
+        //     shape.min_distance_from(p)
+        // });
+
+        let dists = DistMap::new(span.clone(), shape, resolution);
 
         let before_second = Instant::now();
 
@@ -131,14 +133,14 @@ impl MeshBuffer {
         // cell does not cross the surface.
         //
         let mut raw_vbuf = Vec::new();
-        let points = GridTable::fill_with(resolution, |x, y, z| {
+        let points = GridTable::fill_with(resolution - 1, |x, y, z| {
             // Calculate the position of all eight corners of the current cell
             // in world space. The term "lower corner" describes the corner
             // with the lowest x, y and z coordinates.
             let corners = {
                 // The world space distance between two corners/between the
                 // center points of two cells.
-                let step = (span.end - span.start) / resolution as f32;
+                let step = (span.end - span.start) / (resolution - 1) as f32;
 
                 // World position of this cell's lower corner
                 let p0 = span.start
@@ -158,15 +160,33 @@ impl MeshBuffer {
 
             // The estimated minimal distances of all eight corners calculated
             // in the prior step.
+            let grid_coords = [
+                (x    , y    , z    ),
+                (x    , y    , z + 1),
+                (x    , y + 1, z    ),
+                (x    , y + 1, z + 1),
+                (x + 1, y    , z    ),
+                (x + 1, y    , z + 1),
+                (x + 1, y + 1, z    ),
+                (x + 1, y + 1, z + 1),
+            ];
             let distances = [
-                dists[(x    , y    , z    )],
-                dists[(x    , y    , z + 1)],
-                dists[(x    , y + 1, z    )],
-                dists[(x    , y + 1, z + 1)],
-                dists[(x + 1, y    , z    )],
-                dists[(x + 1, y    , z + 1)],
-                dists[(x + 1, y + 1, z    )],
-                dists[(x + 1, y + 1, z + 1)],
+                dists.at((x    , y    , z    )).unwrap(),
+                dists.at((x    , y    , z + 1)).unwrap(),
+                dists.at((x    , y + 1, z    )).unwrap(),
+                dists.at((x    , y + 1, z + 1)).unwrap(),
+                dists.at((x + 1, y    , z    )).unwrap(),
+                dists.at((x + 1, y    , z + 1)).unwrap(),
+                dists.at((x + 1, y + 1, z    )).unwrap(),
+                dists.at((x + 1, y + 1, z + 1)).unwrap(),
+                // dists[(x    , y    , z    )],
+                // dists[(x    , y    , z + 1)],
+                // dists[(x    , y + 1, z    )],
+                // dists[(x    , y + 1, z + 1)],
+                // dists[(x + 1, y    , z    )],
+                // dists[(x + 1, y    , z + 1)],
+                // dists[(x + 1, y + 1, z    )],
+                // dists[(x + 1, y + 1, z + 1)],
             ];
 
             // First, check if the current cell is only partially inside the
@@ -282,19 +302,19 @@ impl MeshBuffer {
             // Now we only calculate some meta data which might be used to
             // color the vertex.
             let dist_p = shape.min_distance_from(p);
-            let dist_p = 0.0;
+            // let dist_p = 0.0;
 
             let normal = {
-                // let delta = 0.01 * (span.end - span.start) / resolution as f32;
-                // Vector3::new(
-                //     shape.min_distance_from(p + Vector3::unit_x() * delta.x)
-                //         - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
-                //     shape.min_distance_from(p + Vector3::unit_y() * delta.y)
-                //         - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
-                //     shape.min_distance_from(p + Vector3::unit_z() * delta.z)
-                //         - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
-                // ).normalize()
-                Vector3::new(1.0, 0.0, 0.0)
+                let delta = 0.01 * (span.end - span.start) / resolution as f32;
+                Vector3::new(
+                    shape.min_distance_from(p + Vector3::unit_x() * delta.x)
+                        - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
+                    shape.min_distance_from(p + Vector3::unit_y() * delta.y)
+                        - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
+                    shape.min_distance_from(p + Vector3::unit_z() * delta.z)
+                        - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
+                ).normalize()
+                // Vector3::new(1.0, 0.0, 0.0)
             };
 
             raw_vbuf.push(Vertex {
@@ -317,7 +337,7 @@ impl MeshBuffer {
         // vertices inside the four cells the edge is adjacent to.
         //
         let mut raw_ibuf = Vec::new();
-        for (x, y, z) in cube(resolution) {
+        for (x, y, z) in cube(resolution - 1) {
             // We iterate over all edges by iterating over all lower corners of
             // all cells.
             //
@@ -328,7 +348,8 @@ impl MeshBuffer {
             // are always `Some()`.
 
             // Edge from the current corner pointing in +x direction
-            if y > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x + 1, y, z)].signum()  {
+            if y > 0 && z > 0 && dists.inclusion_at((x, y, z)) != dists.inclusion_at((x + 1, y, z))  {
+            // if y > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x + 1, y, z)].signum()  {
                 let v0 = points[(x, y - 1, z - 1)].unwrap();
                 let v1 = points[(x, y - 1, z    )].unwrap();
                 let v2 = points[(x, y    , z - 1)].unwrap();
@@ -341,7 +362,8 @@ impl MeshBuffer {
             }
 
             // Edge from the current corner pointing in +y direction
-            if x > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x, y + 1, z)].signum()  {
+            if x > 0 && z > 0 && dists.inclusion_at((x, y, z)) != dists.inclusion_at((x, y + 1, z))  {
+            // if x > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x, y + 1, z)].signum()  {
                 let v0 = points[(x - 1, y, z - 1)].unwrap();
                 let v1 = points[(x - 1, y, z    )].unwrap();
                 let v2 = points[(x,     y, z - 1)].unwrap();
@@ -354,7 +376,8 @@ impl MeshBuffer {
             }
 
             // Edge from the current corner pointing in +z direction
-            if x > 0 && y > 0 && dists[(x, y, z)].signum() != dists[(x, y, z + 1)].signum()  {
+            if x > 0 && y > 0 && dists.inclusion_at((x, y, z)) != dists.inclusion_at((x, y, z + 1))  {
+            // if x > 0 && y > 0 && dists[(x, y, z)].signum() != dists[(x, y, z + 1)].signum()  {
                 let v0 = points[(x - 1, y - 1, z)].unwrap();
                 let v1 = points[(x - 1, y    , z)].unwrap();
                 let v2 = points[(x,     y - 1, z)].unwrap();

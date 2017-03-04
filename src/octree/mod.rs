@@ -124,7 +124,7 @@ impl<'a, L, I> IntoIterator for &'a mut Octree<L, I> {
 /// One node of the octree. This type is implementation detail of the data
 /// structure and isn't usually exposed to the user.
 #[derive(Debug, PartialEq, Eq)]
-enum Octnode<L, I> {
+pub enum Octnode<L, I> {
     /// At this point, space is not further subdivided
     Leaf(Option<L>),
 
@@ -152,10 +152,19 @@ enum Octnode<L, I> {
 
 /// An *im*mutable reference to a node inside the tree that knows about its
 /// span.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NodeEntry<'a, L: 'a, I: 'a> {
     node: &'a Octnode<L, I>,
     span: Span,
+}
+
+impl<'a, L, I> Clone for NodeEntry<'a, L, I> {
+    fn clone(&self) -> Self {
+        NodeEntry {
+            node: self.node,
+            span: self.span.clone(),
+        }
+    }
 }
 
 impl<'a, L, I> NodeEntry<'a, L, I> {
@@ -204,6 +213,24 @@ impl<'a, L, I> NodeEntry<'a, L, I> {
                     .collect()
                 )
             },
+            _ => None,
+        }
+    }
+
+    pub fn child(&self, idx: u8) -> Option<Self> {
+        match *self.node {
+            Octnode::SubTree { ref children, .. } => {
+                let start = self.span.start;
+                let half_diff = (self.span.end - start) / 2.0;
+                let child_start = start
+                    + half_diff.mul_element_wise(SPLIT_SPAN_DIFF_AMOUNT[idx as usize]);
+                let child_end = child_start + half_diff;
+
+                Some(NodeEntry {
+                    node: &children[idx as usize],
+                    span: child_start .. child_end,
+                })
+            }
             _ => None,
         }
     }

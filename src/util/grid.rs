@@ -35,6 +35,20 @@ impl<T> GridTable<T> {
             data: data,
         }
     }
+
+    // pub fn from_raw_vec(v: Vec<T>) -> Self {
+    //     let size = (v.len() as f64).cbrt() as u32;
+    //     assert_eq!((size as usize).pow(3), v.len());
+
+    //     GridTable {
+    //         size: size,
+    //         data: v,
+    //     }
+    // }
+
+    // pub fn raw_slice(&self) -> &[T] {
+    //     &self.data
+    // }
 }
 
 impl<T> Index<(u32, u32, u32)> for GridTable<T> {

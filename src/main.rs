@@ -34,6 +34,20 @@ fn main() {
     use term_painter::Color::*;
     use term_painter::ToStyle;
 
+    // use mesh::buffer::MeshBuffer;
+    // use core::math::*;
+
+    // let shape = core::shape::Mandelbulb::classic(6, 2.5);
+    // let buf = MeshBuffer::generate_for_box(
+    //     &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+    //     &shape,
+    //     128,
+    // );
+
+    // println!("{:?}", buf.0.raw_vbuf().len());
+    // return;
+
+
     // Init logger implementation
     env_logger::init().expect("failed to initialize logger");
 
