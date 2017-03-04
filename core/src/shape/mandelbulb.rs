@@ -6,7 +6,7 @@ use super::Shape;
 /// [1]: http://www.skytopia.com/project/fractal/mandelbulb.html
 #[derive(Clone)]
 pub struct Mandelbulb {
-    power: f32,
+    power: u8,
     max_iters: u64,
     bailout: f32,
 }
@@ -14,7 +14,7 @@ pub struct Mandelbulb {
 const CENTER: Point3<f32> = Point3 { x: 0.0, y: 0.0, z: 0.0 };
 
 impl Mandelbulb {
-    pub fn new(power: f32, max_iters: u64, bailout: f32) -> Self {
+    pub fn new(power: u8, max_iters: u64, bailout: f32) -> Self {
         Mandelbulb {
             power: power,
             max_iters: max_iters,
@@ -23,7 +23,7 @@ impl Mandelbulb {
     }
 
     pub fn classic(max_iters: u64, bailout: f32) -> Self {
-        Self::new(8.0, max_iters, bailout)
+        Self::new(8, max_iters, bailout)
     }
 }
 
@@ -56,7 +56,7 @@ impl Shape for Mandelbulb {
                 break;
             }
 
-            dr = r.powf(self.power - 1.0) * self.power * dr + 1.0;
+            dr = r.powi(self.power as i32 - 1) * (self.power as f32) * dr + 1.0;
             z = rotate(z, self.power) + (p - CENTER);
         }
 
@@ -79,7 +79,7 @@ impl Shape for Mandelbulb {
 /// This operation rotates the point as triplex number. This is equivalent to
 /// the squaring in the original 2D mandelbrot. First we convert the point
 /// to spherical coordinates, then we rotate and convert them back.
-fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {
+fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
     // Handle special case (general formula is not able to handle points on
     // the z axis).
     if p.x == 0.0 && p.y == 0.0 {
@@ -87,8 +87,8 @@ fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {
         let theta = (p.z / old_radius).acos();
 
         // Scale and rotate the point
-        let new_radius = old_radius.powf(power);
-        let theta = theta * power;
+        let new_radius = old_radius.powi(power.into());
+        let theta = theta * power as f32;
 
         // Convert back to cartesian coordinates
         return new_radius * Point3::new(0.0, 0.0, theta.cos());
@@ -98,7 +98,7 @@ fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {
     // For some integer powers there are formulas without trigonometric
     // functions. This improves performance.
     match power {
-        8.0 => {
+        8 => {
             let Point3 { x, y, z } = p;
 
             // Yes we actually need to do that, LLVM won't generate optimal
@@ -161,9 +161,9 @@ fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {
             let phi = f32::atan2(p.y, p.x);
 
             // Scale and rotate the point
-            let new_radius = old_radius.powf(power);
-            let theta = theta * power;
-            let phi = phi * power;
+            let new_radius = old_radius.powi(power.into());
+            let theta = theta * power as f32;
+            let phi = phi * power as f32;
 
             // Convert back to cartesian coordinates
             new_radius * Point3::new(
