@@ -81,7 +81,7 @@ impl DistMap {
 
             let center_dist = shape.min_distance_from(chunk_center);
             //
-            if (center_dist * 1.0).abs() > chunk_radius {
+            if (center_dist * 3.0).abs() > chunk_radius {
                 lookup.push(BoxState::Skipped(Inclusion::from_dist(center_dist)));
             } else {
 

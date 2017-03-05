@@ -97,6 +97,26 @@ impl MeshBuffer {
         shape: &Shape,
         resolution: u32,
     ) -> (Self, Timings) {
+        fn interpolate(
+            p: Point3<f32>,
+            values: &[f32; 8],
+            min: Point3<f32>,
+            max: Point3<f32>,
+        ) -> f32 {
+            let d = (p - min).div_element_wise(max - min);
+
+            let c00 = values[0] * (1.0 - d.x) + values[4] * d.x;
+            let c01 = values[1] * (1.0 - d.x) + values[5] * d.x;
+            let c10 = values[2] * (1.0 - d.x) + values[6] * d.x;
+            let c11 = values[3] * (1.0 - d.x) + values[7] * d.x;
+
+            let c0 = c00 * (1.0 - d.y) + c10 * d.y;
+            let c1 = c01 * (1.0 - d.y) + c11 * d.y;
+
+            c0 * (1.0 - d.z) + c1 * d.z
+        }
+
+
         // Adjust span to avoid holes in between two boxes
         let span = {
             let overflow = (span.end - span.start) / (resolution - 1) as f32;
@@ -135,32 +155,19 @@ impl MeshBuffer {
         let mut raw_vbuf = Vec::new();
         let mut vertices = GridTable::fill_with(resolution - 1, |_, _, _| None);
         for (x, y) in iter::square(resolution - 1) {
-            let mut samples = [
-                dists.at((x    , y    , 0)),
-                dists.at((x + 1, y    , 0)),
-                dists.at((x    , y + 1, 0)),
-                dists.at((x + 1, y + 1, 0)),
+            // Calculate the position of all eight corners of the current cell
+            // in world space. The term "lower corner" describes the corner
+            // with the lowest x, y and z coordinates.
+            let (mut corners, step_z) = {
+                // The world space distance between two corners/between the
+                // center points of two cells.
+                let step = (span.end - span.start) / (resolution - 1) as f32;
 
-                // These four are dummy values and will be overwritten!
-                dists.at((x    , y    , 0)),
-                dists.at((x + 1, y    , 0)),
-                dists.at((x    , y + 1, 0)),
-                dists.at((x + 1, y + 1, 0)),
-            ];
+                // World position of this cell's lower corner
+                let p0 = span.start
+                    + Vector3::new(x, y, 0).cast::<f32>().mul_element_wise(step);
 
-            for z in 0..resolution - 1 {
-                // Calculate the position of all eight corners of the current cell
-                // in world space. The term "lower corner" describes the corner
-                // with the lowest x, y and z coordinates.
-                let corners = {
-                    // The world space distance between two corners/between the
-                    // center points of two cells.
-                    let step = (span.end - span.start) / (resolution - 1) as f32;
-
-                    // World position of this cell's lower corner
-                    let p0 = span.start
-                        + Vector3::new(x, y, z).cast::<f32>().mul_element_wise(step);
-
+                (
                     [
                         p0 + Vector3::new(   0.0,    0.0,    0.0),
                         p0 + Vector3::new(   0.0,    0.0, step.z),
@@ -170,12 +177,27 @@ impl MeshBuffer {
                         p0 + Vector3::new(step.x,    0.0, step.z),
                         p0 + Vector3::new(step.x, step.y,    0.0),
                         p0 + Vector3::new(step.x, step.y, step.z),
-                    ]
-                };
+                    ],
+                    step.z
+                )
+            };
 
-                samples[4] = dists.at((x    , y    , z + 1));
-                samples[6] = dists.at((x + 1, y    , z + 1));
-                samples[5] = dists.at((x    , y + 1, z + 1));
+            // Every second value is a dummy value which will be overwritten
+            let mut samples = [
+                dists.at((x    , y    , 0)),
+                dists.at((x    , y    , 0)),
+                dists.at((x    , y + 1, 0)),
+                dists.at((x    , y + 1, 0)),
+                dists.at((x + 1, y    , 0)),
+                dists.at((x + 1, y    , 0)),
+                dists.at((x + 1, y + 1, 0)),
+                dists.at((x + 1, y + 1, 0)),
+            ];
+
+            for z in 0..resolution - 1 {
+                samples[1] = dists.at((x    , y    , z + 1));
+                samples[3] = dists.at((x    , y + 1, z + 1));
+                samples[5] = dists.at((x + 1, y    , z + 1));
                 samples[7] = dists.at((x + 1, y + 1, z + 1));
 
                 // First, check if the current cell is only partially inside the
@@ -186,135 +208,173 @@ impl MeshBuffer {
                     samples.iter().all(|qr| qr.is_outside())
                 );
 
-                if !partially_in {
-                    continue;
+                if partially_in {
+
+                    // We want to iterate over all 12 edges of the cell. Here, we list
+                    // all edges by specifying their corner indices.
+                    const EDGES: [(usize, usize); 12] = [
+                        // Edges whose endpoints differ in the x coordinate (first
+                        // corner id is -x, second is +x).
+                        (0, 4),     //    -y -z
+                        (1, 5),     //    -y +z
+                        (2, 6),     //    +y -z
+                        (3, 7),     //    +y +z
+
+                        // Edges whose endpoints differ in the y coordinate (first
+                        // corner id is -y, second is +y).
+                        (0, 2),     // -x    -z
+                        (1, 3),     // -x    +z
+                        (4, 6),     // +x    -z
+                        (5, 7),     // +x    +z
+
+                        // Edges whose endpoints differ in the z coordinate (first
+                        // corner id is -z, second is +z).
+                        (0, 1),     // -x -y
+                        (2, 3),     // -x +y
+                        (4, 5),     // +x -y
+                        (6, 7),     // +x +y
+                    ];
+
+                    // Get all edge crossings. These are points where the edges of the
+                    // current cell intersect the surface... more or less. We do NOT
+                    // find the correct crossing point by ray marching, as this would
+                    // require more queries to the shape (our current bottleneck for
+                    // mandelbulb).
+                    //
+                    // Instead, we simply weight both endpoints of the edge by the
+                    // already calculated distances. Improving this might be worth
+                    // experimenting (see #1).
+                    let points: Vec<_> = EDGES.iter().cloned()
+
+                        // We are only interested in the edges with shape crossing. The
+                        // edge crosses the shape iff the endpoints' estimated minimal
+                        // distances have different signs ("minus" means: inside the
+                        // shape).
+                        .filter(|&(from, to)| {
+                            samples[from].inclusion() != samples[to].inclusion()
+                        })
+
+                        // Next, we convert the edge into a vertex on said edge. We
+                        // could just use the center point of the two endpoints. But
+                        // weighting each endpoint with the estimated minimal distance
+                        // from the shape results in a mesh more closely representing
+                        // the shape.
+                        .map(|(from, to)| {
+                            // Here we want to make sure that `d_from` is  negative and
+                            // `d_to` is positive.
+                            //
+                            // Remember: we already know that both distances have
+                            // different signs!
+                            let (d_from, d_to) = if samples[from].is_inside() {
+                                (samples[from].dist().unwrap_or(0.0), samples[to].dist().unwrap_or(0.0))
+                            } else {
+                                (-samples[from].dist().unwrap_or(0.0), -samples[to].dist().unwrap_or(0.0))
+                            };
+
+                            // This condition is only true if `d_from == -0.0`. In
+                            // theory this might happen, so we better deal with it.
+                            let weight_from = if d_to == d_from {
+                                0.5
+                            } else {
+                                // Here we calculate the weight (a number between 0 and
+                                // 1 inclusive) for the `from` endpoint. `delta` is
+                                // the difference between the two distances.
+                                //
+                                // First we will shift the distance to "the right",
+                                // making it positive. Then, we scale it by delta.
+                                //
+                                // - d_from + delta is always >= 0.0
+                                // - d_from + delta is always <= delta
+                                // ==> `(d_from + delta) / delta` is always in 0...1
+                                //
+                                // For d_from == 0 and d_to > 0:
+                                // - d_from + delta == delta
+                                // ==> result is: delta / delta == 1
+                                //
+                                // For d_from < 0 and d_to == 0:
+                                // - d_from + delta == 0
+                                // ==> result is: 0 / delta == 0
+                                let delta = d_to - d_from;
+                                (d_from + delta) / delta
+                            };
+
+                            lerp(corners[from], corners[to], weight_from)
+                        })
+                        .collect();
+
+                    // As described in the article above, we simply use the centroid
+                    // of all edge crossings.
+                    let p = Point3::centroid(&points);
+
+                    let dists = [
+                        samples[0].dist().unwrap_or(0.0),
+                        samples[1].dist().unwrap_or(0.0),
+                        samples[2].dist().unwrap_or(0.0),
+                        samples[3].dist().unwrap_or(0.0),
+                        samples[4].dist().unwrap_or(0.0),
+                        samples[5].dist().unwrap_or(0.0),
+                        samples[6].dist().unwrap_or(0.0),
+                        samples[7].dist().unwrap_or(0.0),
+                    ];
+
+                    // Now we only calculate some meta data which might be used to
+                    // color the vertex.
+                    // let dist_p = shape.min_distance_from(p);
+                    // let dist_p = 0.0;
+
+                    let normal = {
+                        let delta = 1.0 * (span.end - span.start) / resolution as f32;
+                        // Vector3::new(
+                        //     shape.min_distance_from(p + Vector3::unit_x() * delta.x)
+                        //         - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
+                        //     shape.min_distance_from(p + Vector3::unit_y() * delta.y)
+                        //         - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
+                        //     shape.min_distance_from(p + Vector3::unit_z() * delta.z)
+                        //         - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
+                        // ).normalize()
+
+                        let v = Vector3::new(
+                            interpolate(p + Vector3::unit_x() * delta.x, &dists, corners[0], corners[7])
+                                - interpolate(p +  Vector3::unit_x() * -delta.x, &dists, corners[0], corners[7]),
+                            interpolate(p + Vector3::unit_y() * delta.y, &dists, corners[0], corners[7])
+                                - interpolate(p +  Vector3::unit_y() * -delta.y, &dists, corners[0], corners[7]),
+                            interpolate(p + Vector3::unit_z() * delta.z, &dists, corners[0], corners[7])
+                                - interpolate(p +  Vector3::unit_z() * -delta.z, &dists, corners[0], corners[7]),
+                        );
+                        if v.magnitude() == 0.0 {
+
+                            println!("{:?}", v);
+                            println!("dists: {:#?}", dists);
+                            println!("samples: {:#?}", samples);
+                            // panic!();
+                        }
+
+                        v.normalize()
+
+
+                        // Vector3::new(1.0, 0.0, 0.0)
+                    };
+                    let distp2 = interpolate(p, &dists, corners[0], corners[7]);
+                    // let distp2 = 0.0;
+
+
+                    raw_vbuf.push(Vertex {
+                        position: p.to_vec().cast::<f32>().to_arr(),
+                        normal: normal.to_arr(),
+                        distance_from_surface: distp2,
+                    });
+                    vertices[(x, y, z)] = Some(raw_vbuf.len() as u32 - 1);
                 }
 
-                // We want to iterate over all 12 edges of the cell. Here, we list
-                // all edges by specifying their corner indices.
-                const EDGES: [(usize, usize); 12] = [
-                    // Edges whose endpoints differ in the x coordinate (first
-                    // corner id is -x, second is +x).
-                    (0, 1),     //    -y -z
-                    (2, 3),     //    +y -z
-                    (4, 5),     //    -y +z
-                    (6, 7),     //    +y +z
+                // Prepare running values for next iteration
+                samples[0] = samples[1];
+                samples[2] = samples[3];
+                samples[4] = samples[5];
+                samples[6] = samples[7];
 
-                    // Edges whose endpoints differ in the y coordinate (first
-                    // corner id is -y, second is +y).
-                    (0, 2),     // -x    -z
-                    (1, 3),     // +x    -z
-                    (4, 6),     // -x    +z
-                    (5, 7),     // +x    +z
-
-                    // Edges whose endpoints differ in the z coordinate (first
-                    // corner id is -z, second is +z).
-                    (0, 4),     // -x -y
-                    (1, 5),     // +x -y
-                    (2, 6),     // -x +y
-                    (3, 7),     // +x +y
-                ];
-
-                // Get all edge crossings. These are points where the edges of the
-                // current cell intersect the surface... more or less. We do NOT
-                // find the correct crossing point by ray marching, as this would
-                // require more queries to the shape (our current bottleneck for
-                // mandelbulb).
-                //
-                // Instead, we simply weight both endpoints of the edge by the
-                // already calculated distances. Improving this might be worth
-                // experimenting (see #1).
-                let points: Vec<_> = EDGES.iter().cloned()
-
-                    // We are only interested in the edges with shape crossing. The
-                    // edge crosses the shape iff the endpoints' estimated minimal
-                    // distances have different signs ("minus" means: inside the
-                    // shape).
-                    .filter(|&(from, to)| {
-                        samples[from].inclusion() != samples[to].inclusion()
-                    })
-
-                    // Next, we convert the edge into a vertex on said edge. We
-                    // could just use the center point of the two endpoints. But
-                    // weighting each endpoint with the estimated minimal distance
-                    // from the shape results in a mesh more closely representing
-                    // the shape.
-                    .map(|(from, to)| {
-                        // Here we want to make sure that `d_from` is  negative and
-                        // `d_to` is positive.
-                        //
-                        // Remember: we already know that both distances have
-                        // different signs!
-                        let (d_from, d_to) = if samples[from].is_inside() {
-                            (samples[from].dist().unwrap_or(0.0), samples[to].dist().unwrap_or(0.0))
-                        } else {
-                            (-samples[from].dist().unwrap_or(0.0), -samples[to].dist().unwrap_or(0.0))
-                        };
-
-                        // This condition is only true if `d_from == -0.0`. In
-                        // theory this might happen, so we better deal with it.
-                        let weight_from = if d_to == d_from {
-                            0.5
-                        } else {
-                            // Here we calculate the weight (a number between 0 and
-                            // 1 inclusive) for the `from` endpoint. `delta` is
-                            // the difference between the two distances.
-                            //
-                            // First we will shift the distance to "the right",
-                            // making it positive. Then, we scale it by delta.
-                            //
-                            // - d_from + delta is always >= 0.0
-                            // - d_from + delta is always <= delta
-                            // ==> `(d_from + delta) / delta` is always in 0...1
-                            //
-                            // For d_from == 0 and d_to > 0:
-                            // - d_from + delta == delta
-                            // ==> result is: delta / delta == 1
-                            //
-                            // For d_from < 0 and d_to == 0:
-                            // - d_from + delta == 0
-                            // ==> result is: 0 / delta == 0
-                            let delta = d_to - d_from;
-                            (d_from + delta) / delta
-                        };
-
-                        lerp(corners[from], corners[to], weight_from)
-                    })
-                    .collect();
-
-                // As described in the article above, we simply use the centroid
-                // of all edge crossings.
-                let p = Point3::centroid(&points);
-
-                // Now we only calculate some meta data which might be used to
-                // color the vertex.
-                let dist_p = shape.min_distance_from(p);
-                // let dist_p = 0.0;
-
-                let normal = {
-                    let delta = 0.01 * (span.end - span.start) / resolution as f32;
-                    Vector3::new(
-                        shape.min_distance_from(p + Vector3::unit_x() * delta.x)
-                            - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
-                        shape.min_distance_from(p + Vector3::unit_y() * delta.y)
-                            - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
-                        shape.min_distance_from(p + Vector3::unit_z() * delta.z)
-                            - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
-                    ).normalize()
-                    // Vector3::new(1.0, 0.0, 0.0)
-                };
-
-                raw_vbuf.push(Vertex {
-                    position: p.to_vec().cast::<f32>().to_arr(),
-                    normal: normal.to_arr(),
-                    distance_from_surface: dist_p,
-                });
-                vertices[(x, y, z)] = Some(raw_vbuf.len() as u32 - 1);
-
-                samples[0] = samples[4];
-                samples[1] = samples[5];
-                samples[2] = samples[6];
-                samples[3] = samples[7];
+                for corner in &mut corners {
+                    corner.z += step_z;
+                }
             }
         }
 
@@ -424,56 +484,58 @@ impl MeshBuffer {
 
 
 
-mod benchi {
-    extern crate test;
 
-    use self::test::Bencher;
-    use super::*;
-    use core::shape::Mandelbulb;
 
-    #[bench]
-    fn bench_mandelbulb_10(b: &mut Bencher) {
-        let shape = Mandelbulb::classic(5, 2.5);
-        b.iter(|| MeshBuffer::generate_for_box(
-            &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-            &shape,
-            16,
-        ))
-    }
+// mod benchi {
+//     extern crate test;
 
-    // #[bench]
-    // fn bench_mandelbulb_25(b: &mut Bencher) {
-    //     let shape = Mandelbulb::classic(5, 2.5);
-    //     b.iter(|| MeshBuffer::generate_for_box(
-    //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-    //         &shape,
-    //         25,
-    //     ))
-    // }
+//     use self::test::Bencher;
+//     use super::*;
+//     use core::shape::Mandelbulb;
 
-    // #[bench]
-    // fn bench_mandelbulb_50(b: &mut Bencher) {
-    //     let shape = Mandelbulb::classic(5, 2.5);
-    //     b.iter(|| MeshBuffer::generate_for_box(
-    //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-    //         &shape,
-    //         50,
-    //     ))
-    // }
+//     #[bench]
+//     fn bench_mandelbulb_10(b: &mut Bencher) {
+//         let shape = Mandelbulb::classic(5, 2.5);
+//         b.iter(|| MeshBuffer::generate_for_box(
+//             &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//             &shape,
+//             16,
+//         ))
+//     }
 
-    #[bench]
-    fn classic_5(b: &mut Bencher) {
-        let shape = Mandelbulb::classic(5, 2.5);
-        let points = [
-            Point3::new(0.0, 0.0, 0.0),
-            Point3::new(1.0, 0.0, 0.0),
-            Point3::new(0.0, 1.0, 0.0),
-            Point3::new(0.0, 0.0, 1.0),
-            Point3::new(0.3, 0.3, 0.4),
-        ];
+//     // #[bench]
+//     // fn bench_mandelbulb_25(b: &mut Bencher) {
+//     //     let shape = Mandelbulb::classic(5, 2.5);
+//     //     b.iter(|| MeshBuffer::generate_for_box(
+//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//     //         &shape,
+//     //         25,
+//     //     ))
+//     // }
 
-        b.iter(|| {
-            points.iter().map(|&p| shape.min_distance_from(p)).sum::<f32>()
-        })
-    }
-}
+//     // #[bench]
+//     // fn bench_mandelbulb_50(b: &mut Bencher) {
+//     //     let shape = Mandelbulb::classic(5, 2.5);
+//     //     b.iter(|| MeshBuffer::generate_for_box(
+//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+//     //         &shape,
+//     //         50,
+//     //     ))
+//     // }
+
+//     #[bench]
+//     fn classic_5(b: &mut Bencher) {
+//         let shape = Mandelbulb::classic(5, 2.5);
+//         let points = [
+//             Point3::new(0.0, 0.0, 0.0),
+//             Point3::new(1.0, 0.0, 0.0),
+//             Point3::new(0.0, 1.0, 0.0),
+//             Point3::new(0.0, 0.0, 1.0),
+//             Point3::new(0.3, 0.3, 0.4),
+//         ];
+
+//         b.iter(|| {
+//             points.iter().map(|&p| shape.min_distance_from(p)).sum::<f32>()
+//         })
+//     }
+// }
