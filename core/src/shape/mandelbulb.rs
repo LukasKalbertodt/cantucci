@@ -105,25 +105,25 @@ fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
             // code here. LLVM transforms `x.powf(2)` into `x * x` but that's
             // all. It has probably to do with floating point precision, but
             // it's not that important for us.
-            let x2 = x * x;
-            let x4 = x2 * x2;
-            let x6 = x2 * x4;
-            let x8 = x4 * x4;
+            let x2 = x.powi(2);
+            let x4 = x.powi(4);
+            let x6 = x.powi(6);
+            let x8 = x.powi(8);
 
-            let y2 = y * y;
-            let y4 = y2 * y2;
-            let y6 = y2 * y4;
-            let y8 = y4 * y4;
+            let y2 = y.powi(2);
+            let y4 = y.powi(4);
+            let y6 = y.powi(6);
+            let y8 = y.powi(8);
 
-            let z2 = z * z;
-            let z4 = z2 * z2;
-            let z6 = z2 * z4;
-            let z8 = z4 * z4;
+            let z2 = z.powi(2);
+            let z4 = z.powi(4);
+            let z6 = z.powi(6);
+            let z8 = z.powi(8);
 
             let rxy2 = x2 + y2;
-            let rxy4 = rxy2 * rxy2;
-            let rxy6 = rxy2 * rxy4;
-            let rxy8 = rxy4 * rxy4;
+            let rxy4 = rxy2.powi(2);
+            let rxy6 = rxy2.powi(3);
+            let rxy8 = rxy2.powi(4);
 
             let a = 1.0 + (
                 z8
