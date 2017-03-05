@@ -6,7 +6,7 @@ use core::math::*;
 use core::Shape;
 use octree::Span;
 use util::ToArr;
-use util::iter::cube;
+use util::iter;
 use util::grid::GridTable;
 use util::time::DurationExt;
 
@@ -133,206 +133,190 @@ impl MeshBuffer {
         // cell does not cross the surface.
         //
         let mut raw_vbuf = Vec::new();
-        let points = GridTable::fill_with(resolution - 1, |x, y, z| {
-            // Calculate the position of all eight corners of the current cell
-            // in world space. The term "lower corner" describes the corner
-            // with the lowest x, y and z coordinates.
-            let corners = {
-                // The world space distance between two corners/between the
-                // center points of two cells.
-                let step = (span.end - span.start) / (resolution - 1) as f32;
+        let mut vertices = GridTable::fill_with(resolution - 1, |_, _, _| None);
+        for (x, y) in iter::square(resolution - 1) {
+            let mut samples = [
+                dists.at((x    , y    , 0)),
+                dists.at((x + 1, y    , 0)),
+                dists.at((x    , y + 1, 0)),
+                dists.at((x + 1, y + 1, 0)),
 
-                // World position of this cell's lower corner
-                let p0 = span.start
-                    + Vector3::new(x, y, z).cast::<f32>().mul_element_wise(step);
-
-                [
-                    p0 + Vector3::new(   0.0,    0.0,    0.0),
-                    p0 + Vector3::new(   0.0,    0.0, step.z),
-                    p0 + Vector3::new(   0.0, step.y,    0.0),
-                    p0 + Vector3::new(   0.0, step.y, step.z),
-                    p0 + Vector3::new(step.x,    0.0,    0.0),
-                    p0 + Vector3::new(step.x,    0.0, step.z),
-                    p0 + Vector3::new(step.x, step.y,    0.0),
-                    p0 + Vector3::new(step.x, step.y, step.z),
-                ]
-            };
-
-            // The estimated minimal distances of all eight corners calculated
-            // in the prior step.
-            // let grid_coords = [
-            //     (x    , y    , z    ),
-            //     (x    , y    , z + 1),
-            //     (x    , y + 1, z    ),
-            //     (x    , y + 1, z + 1),
-            //     (x + 1, y    , z    ),
-            //     (x + 1, y    , z + 1),
-            //     (x + 1, y + 1, z    ),
-            //     (x + 1, y + 1, z + 1),
-            // ];
-            let query_results = [
-                // dists.at(grid_coords[0]).unwrap(),
-                // dists.at(grid_coords[1]).unwrap(),
-                // dists.at(grid_coords[2]).unwrap(),
-                // dists.at(grid_coords[3]).unwrap(),
-                // dists.at(grid_coords[4]).unwrap(),
-                // dists.at(grid_coords[5]).unwrap(),
-                // dists.at(grid_coords[6]).unwrap(),
-                // dists.at(grid_coords[7]).unwrap(),
-
-                dists.at((x    , y    , z    )),
-                dists.at((x    , y    , z + 1)),
-                dists.at((x    , y + 1, z    )),
-                dists.at((x    , y + 1, z + 1)),
-                dists.at((x + 1, y    , z    )),
-                dists.at((x + 1, y    , z + 1)),
-                dists.at((x + 1, y + 1, z    )),
-                dists.at((x + 1, y + 1, z + 1)),
-                // dists[(x    , y    , z    )],
-                // dists[(x    , y    , z + 1)],
-                // dists[(x    , y + 1, z    )],
-                // dists[(x    , y + 1, z + 1)],
-                // dists[(x + 1, y    , z    )],
-                // dists[(x + 1, y    , z + 1)],
-                // dists[(x + 1, y + 1, z    )],
-                // dists[(x + 1, y + 1, z + 1)],
+                // These four are dummy values and will be overwritten!
+                dists.at((x    , y    , 0)),
+                dists.at((x + 1, y    , 0)),
+                dists.at((x    , y + 1, 0)),
+                dists.at((x + 1, y + 1, 0)),
             ];
 
-            // First, check if the current cell is only partially inside the
-            // shape (if the cell intersects the shape's surface). If that's
-            // not the case, we won't generate a vertex for this cell.
-            let partially_in = !(
-                query_results.iter().all(|qr| qr.is_inside()) ||
-                query_results.iter().all(|qr| qr.is_outside())
-            );
+            for z in 0..resolution - 1 {
+                // Calculate the position of all eight corners of the current cell
+                // in world space. The term "lower corner" describes the corner
+                // with the lowest x, y and z coordinates.
+                let corners = {
+                    // The world space distance between two corners/between the
+                    // center points of two cells.
+                    let step = (span.end - span.start) / (resolution - 1) as f32;
 
-            if !partially_in {
-                // FIXME
-                // This is a bit hacky, but we will never access this number
-                return None;
+                    // World position of this cell's lower corner
+                    let p0 = span.start
+                        + Vector3::new(x, y, z).cast::<f32>().mul_element_wise(step);
+
+                    [
+                        p0 + Vector3::new(   0.0,    0.0,    0.0),
+                        p0 + Vector3::new(   0.0,    0.0, step.z),
+                        p0 + Vector3::new(   0.0, step.y,    0.0),
+                        p0 + Vector3::new(   0.0, step.y, step.z),
+                        p0 + Vector3::new(step.x,    0.0,    0.0),
+                        p0 + Vector3::new(step.x,    0.0, step.z),
+                        p0 + Vector3::new(step.x, step.y,    0.0),
+                        p0 + Vector3::new(step.x, step.y, step.z),
+                    ]
+                };
+
+                samples[4] = dists.at((x    , y    , z + 1));
+                samples[6] = dists.at((x + 1, y    , z + 1));
+                samples[5] = dists.at((x    , y + 1, z + 1));
+                samples[7] = dists.at((x + 1, y + 1, z + 1));
+
+                // First, check if the current cell is only partially inside the
+                // shape (if the cell intersects the shape's surface). If that's
+                // not the case, we won't generate a vertex for this cell.
+                let partially_in = !(
+                    samples.iter().all(|qr| qr.is_inside()) ||
+                    samples.iter().all(|qr| qr.is_outside())
+                );
+
+                if !partially_in {
+                    continue;
+                }
+
+                // We want to iterate over all 12 edges of the cell. Here, we list
+                // all edges by specifying their corner indices.
+                const EDGES: [(usize, usize); 12] = [
+                    // Edges whose endpoints differ in the x coordinate (first
+                    // corner id is -x, second is +x).
+                    (0, 1),     //    -y -z
+                    (2, 3),     //    +y -z
+                    (4, 5),     //    -y +z
+                    (6, 7),     //    +y +z
+
+                    // Edges whose endpoints differ in the y coordinate (first
+                    // corner id is -y, second is +y).
+                    (0, 2),     // -x    -z
+                    (1, 3),     // +x    -z
+                    (4, 6),     // -x    +z
+                    (5, 7),     // +x    +z
+
+                    // Edges whose endpoints differ in the z coordinate (first
+                    // corner id is -z, second is +z).
+                    (0, 4),     // -x -y
+                    (1, 5),     // +x -y
+                    (2, 6),     // -x +y
+                    (3, 7),     // +x +y
+                ];
+
+                // Get all edge crossings. These are points where the edges of the
+                // current cell intersect the surface... more or less. We do NOT
+                // find the correct crossing point by ray marching, as this would
+                // require more queries to the shape (our current bottleneck for
+                // mandelbulb).
+                //
+                // Instead, we simply weight both endpoints of the edge by the
+                // already calculated distances. Improving this might be worth
+                // experimenting (see #1).
+                let points: Vec<_> = EDGES.iter().cloned()
+
+                    // We are only interested in the edges with shape crossing. The
+                    // edge crosses the shape iff the endpoints' estimated minimal
+                    // distances have different signs ("minus" means: inside the
+                    // shape).
+                    .filter(|&(from, to)| {
+                        samples[from].inclusion() != samples[to].inclusion()
+                    })
+
+                    // Next, we convert the edge into a vertex on said edge. We
+                    // could just use the center point of the two endpoints. But
+                    // weighting each endpoint with the estimated minimal distance
+                    // from the shape results in a mesh more closely representing
+                    // the shape.
+                    .map(|(from, to)| {
+                        // Here we want to make sure that `d_from` is  negative and
+                        // `d_to` is positive.
+                        //
+                        // Remember: we already know that both distances have
+                        // different signs!
+                        let (d_from, d_to) = if samples[from].is_inside() {
+                            (samples[from].dist().unwrap_or(0.0), samples[to].dist().unwrap_or(0.0))
+                        } else {
+                            (-samples[from].dist().unwrap_or(0.0), -samples[to].dist().unwrap_or(0.0))
+                        };
+
+                        // This condition is only true if `d_from == -0.0`. In
+                        // theory this might happen, so we better deal with it.
+                        let weight_from = if d_to == d_from {
+                            0.5
+                        } else {
+                            // Here we calculate the weight (a number between 0 and
+                            // 1 inclusive) for the `from` endpoint. `delta` is
+                            // the difference between the two distances.
+                            //
+                            // First we will shift the distance to "the right",
+                            // making it positive. Then, we scale it by delta.
+                            //
+                            // - d_from + delta is always >= 0.0
+                            // - d_from + delta is always <= delta
+                            // ==> `(d_from + delta) / delta` is always in 0...1
+                            //
+                            // For d_from == 0 and d_to > 0:
+                            // - d_from + delta == delta
+                            // ==> result is: delta / delta == 1
+                            //
+                            // For d_from < 0 and d_to == 0:
+                            // - d_from + delta == 0
+                            // ==> result is: 0 / delta == 0
+                            let delta = d_to - d_from;
+                            (d_from + delta) / delta
+                        };
+
+                        lerp(corners[from], corners[to], weight_from)
+                    })
+                    .collect();
+
+                // As described in the article above, we simply use the centroid
+                // of all edge crossings.
+                let p = Point3::centroid(&points);
+
+                // Now we only calculate some meta data which might be used to
+                // color the vertex.
+                let dist_p = shape.min_distance_from(p);
+                // let dist_p = 0.0;
+
+                let normal = {
+                    let delta = 0.01 * (span.end - span.start) / resolution as f32;
+                    Vector3::new(
+                        shape.min_distance_from(p + Vector3::unit_x() * delta.x)
+                            - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
+                        shape.min_distance_from(p + Vector3::unit_y() * delta.y)
+                            - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
+                        shape.min_distance_from(p + Vector3::unit_z() * delta.z)
+                            - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
+                    ).normalize()
+                    // Vector3::new(1.0, 0.0, 0.0)
+                };
+
+                raw_vbuf.push(Vertex {
+                    position: p.to_vec().cast::<f32>().to_arr(),
+                    normal: normal.to_arr(),
+                    distance_from_surface: dist_p,
+                });
+                vertices[(x, y, z)] = Some(raw_vbuf.len() as u32 - 1);
+
+                samples[0] = samples[4];
+                samples[1] = samples[5];
+                samples[2] = samples[6];
+                samples[3] = samples[7];
             }
-
-            // We want to iterate over all 12 edges of the cell. Here, we list
-            // all edges by specifying their corner indices.
-            const EDGES: [(usize, usize); 12] = [
-                // Edges whose endpoints differ in the x coordinate (first
-                // corner id is -x, second is +x).
-                (0, 4),     //    -y -z
-                (1, 5),     //    -y +z
-                (2, 6),     //    +y -z
-                (3, 7),     //    +y +z
-
-                // Edges whose endpoints differ in the y coordinate (first
-                // corner id is -y, second is +y).
-                (0, 2),     // -x    -z
-                (1, 3),     // -x    +z
-                (4, 6),     // +x    -z
-                (5, 7),     // +x    +z
-
-                // Edges whose endpoints differ in the z coordinate (first
-                // corner id is -z, second is +z).
-                (0, 1),     // -x -y
-                (2, 3),     // -x +y
-                (4, 5),     // +x -y
-                (6, 7),     // +x +y
-            ];
-
-            // Get all edge crossings. These are points where the edges of the
-            // current cell intersect the surface... more or less. We do NOT
-            // find the correct crossing point by ray marching, as this would
-            // require more queries to the shape (our current bottleneck for
-            // mandelbulb).
-            //
-            // Instead, we simply weight both endpoints of the edge by the
-            // already calculated distances. Improving this might be worth
-            // experimenting (see #1).
-            let points: Vec<_> = EDGES.iter().cloned()
-
-                // We are only interested in the edges with shape crossing. The
-                // edge crosses the shape iff the endpoints' estimated minimal
-                // distances have different signs ("minus" means: inside the
-                // shape).
-                .filter(|&(from, to)| {
-                    query_results[from].inclusion() != query_results[to].inclusion()
-                })
-
-                // Next, we convert the edge into a vertex on said edge. We
-                // could just use the center point of the two endpoints. But
-                // weighting each endpoint with the estimated minimal distance
-                // from the shape results in a mesh more closely representing
-                // the shape.
-                .map(|(from, to)| {
-                    // Here we want to make sure that `d_from` is  negative and
-                    // `d_to` is positive.
-                    //
-                    // Remember: we already know that both distances have
-                    // different signs!
-                    let (d_from, d_to) = if query_results[from].is_inside() {
-                        (query_results[from].dist().unwrap_or(0.0), query_results[to].dist().unwrap_or(0.0))
-                    } else {
-                        (-query_results[from].dist().unwrap_or(0.0), -query_results[to].dist().unwrap_or(0.0))
-                    };
-
-                    // This condition is only true if `d_from == -0.0`. In
-                    // theory this might happen, so we better deal with it.
-                    let weight_from = if d_to == d_from {
-                        0.5
-                    } else {
-                        // Here we calculate the weight (a number between 0 and
-                        // 1 inclusive) for the `from` endpoint. `delta` is
-                        // the difference between the two distances.
-                        //
-                        // First we will shift the distance to "the right",
-                        // making it positive. Then, we scale it by delta.
-                        //
-                        // - d_from + delta is always >= 0.0
-                        // - d_from + delta is always <= delta
-                        // ==> `(d_from + delta) / delta` is always in 0...1
-                        //
-                        // For d_from == 0 and d_to > 0:
-                        // - d_from + delta == delta
-                        // ==> result is: delta / delta == 1
-                        //
-                        // For d_from < 0 and d_to == 0:
-                        // - d_from + delta == 0
-                        // ==> result is: 0 / delta == 0
-                        let delta = d_to - d_from;
-                        (d_from + delta) / delta
-                    };
-
-                    lerp(corners[from], corners[to], weight_from)
-                })
-                .collect();
-
-            // As described in the article above, we simply use the centroid
-            // of all edge crossings.
-            let p = Point3::centroid(&points);
-
-            // Now we only calculate some meta data which might be used to
-            // color the vertex.
-            let dist_p = shape.min_distance_from(p);
-            // let dist_p = 0.0;
-
-            let normal = {
-                let delta = 0.01 * (span.end - span.start) / resolution as f32;
-                Vector3::new(
-                    shape.min_distance_from(p + Vector3::unit_x() * delta.x)
-                        - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
-                    shape.min_distance_from(p + Vector3::unit_y() * delta.y)
-                        - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
-                    shape.min_distance_from(p + Vector3::unit_z() * delta.z)
-                        - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
-                ).normalize()
-                // Vector3::new(1.0, 0.0, 0.0)
-            };
-
-            raw_vbuf.push(Vertex {
-                position: p.to_vec().cast::<f32>().to_arr(),
-                normal: normal.to_arr(),
-                distance_from_surface: dist_p,
-            });
-            Some(raw_vbuf.len() as u32 - 1)
-        });
+        }
 
         let before_third = Instant::now();
 
@@ -346,7 +330,7 @@ impl MeshBuffer {
         // vertices inside the four cells the edge is adjacent to.
         //
         let mut raw_ibuf = Vec::new();
-        for (x, y, z) in cube(resolution - 1) {
+        for (x, y, z) in iter::cube(resolution - 1) {
             // We iterate over all edges by iterating over all lower corners of
             // all cells.
             //
@@ -359,10 +343,10 @@ impl MeshBuffer {
             // Edge from the current corner pointing in +x direction
             if y > 0 && z > 0 && dists.inclusion_at((x, y, z)) != dists.inclusion_at((x + 1, y, z))  {
             // if y > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x + 1, y, z)].signum()  {
-                let v0 = points[(x, y - 1, z - 1)].unwrap();
-                let v1 = points[(x, y - 1, z    )].unwrap();
-                let v2 = points[(x, y    , z - 1)].unwrap();
-                let v3 = points[(x, y    , z    )].unwrap();
+                let v0 = vertices[(x, y - 1, z - 1)].unwrap();
+                let v1 = vertices[(x, y - 1, z    )].unwrap();
+                let v2 = vertices[(x, y    , z - 1)].unwrap();
+                let v3 = vertices[(x, y    , z    )].unwrap();
 
                 raw_ibuf.extend_from_slice(&[
                     v0, v1, v2,
@@ -373,10 +357,10 @@ impl MeshBuffer {
             // Edge from the current corner pointing in +y direction
             if x > 0 && z > 0 && dists.inclusion_at((x, y, z)) != dists.inclusion_at((x, y + 1, z))  {
             // if x > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x, y + 1, z)].signum()  {
-                let v0 = points[(x - 1, y, z - 1)].unwrap();
-                let v1 = points[(x - 1, y, z    )].unwrap();
-                let v2 = points[(x,     y, z - 1)].unwrap();
-                let v3 = points[(x,     y, z    )].unwrap();
+                let v0 = vertices[(x - 1, y, z - 1)].unwrap();
+                let v1 = vertices[(x - 1, y, z    )].unwrap();
+                let v2 = vertices[(x,     y, z - 1)].unwrap();
+                let v3 = vertices[(x,     y, z    )].unwrap();
 
                 raw_ibuf.extend_from_slice(&[
                     v0, v1, v2,
@@ -387,10 +371,10 @@ impl MeshBuffer {
             // Edge from the current corner pointing in +z direction
             if x > 0 && y > 0 && dists.inclusion_at((x, y, z)) != dists.inclusion_at((x, y, z + 1))  {
             // if x > 0 && y > 0 && dists[(x, y, z)].signum() != dists[(x, y, z + 1)].signum()  {
-                let v0 = points[(x - 1, y - 1, z)].unwrap();
-                let v1 = points[(x - 1, y    , z)].unwrap();
-                let v2 = points[(x,     y - 1, z)].unwrap();
-                let v3 = points[(x,     y    , z)].unwrap();
+                let v0 = vertices[(x - 1, y - 1, z)].unwrap();
+                let v1 = vertices[(x - 1, y    , z)].unwrap();
+                let v2 = vertices[(x,     y - 1, z)].unwrap();
+                let v3 = vertices[(x,     y    , z)].unwrap();
 
                 raw_ibuf.extend_from_slice(&[
                     v0, v1, v2,

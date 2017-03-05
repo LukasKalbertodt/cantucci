@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 use util::iter;
 
@@ -65,5 +65,21 @@ impl<T> Index<(u32, u32, u32)> for GridTable<T> {
             + z as usize;
 
         &self.data[idx]
+    }
+}
+
+impl<T> IndexMut<(u32, u32, u32)> for GridTable<T> {
+
+    fn index_mut(&mut self, (x, y, z): (u32, u32, u32)) -> &mut Self::Output {
+        assert!(x < self.size);
+        assert!(y < self.size);
+        assert!(z < self.size);
+
+        let idx =
+            (x as usize) * (self.size as usize).pow(2)
+            + (y as usize * self.size as usize)
+            + z as usize;
+
+        &mut self.data[idx]
     }
 }
