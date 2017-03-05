@@ -1,134 +1,178 @@
 use core::math::*;
 use core::shape::Shape;
-use octree::{Octree, Span, NodeEntryMut};
-use util::grid::GridTable;
+use octree::Span;
+use util::iter;
 
+/// How often the box is split in one dimension. One split results in 8
+/// children (like in an octree). Two splits result in 8² = 64 children, and
+/// so on ...
+const NUM_SPLITS: u32 = 4;
 
-/// The size of all leaves in the distmap octree. Nodes with this size won't
-/// be split.
-const LEAF_SIZE: u32 = 16;
+/// When we split x times in one dimension, we will have 2^x many sections in
+/// that dimension;
+const SECTIONS: u32 = 1 << NUM_SPLITS;
 
 pub struct DistMap {
-    tree: Octree<NodeState, ()>,
+    // tree: Octree<NodeState, ()>,
+    lookup: Box<[BoxState]>,
+    dists: Box<[f32]>,
     resolution: u32,
+    chunk_len: u32,
+    mask_low_bits: u32,
+    num_low_bits: u8,
+}
+
+enum BoxState {
+    Skipped(Inclusion),
+    /// The integer functions as an index into the `dists` array.
+    Exact(u32),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum QueryResult {
+    Skipped(Inclusion),
+    Exact(f32),
+}
+
+impl QueryResult {
+    pub fn inclusion(&self) -> Inclusion {
+        match *self {
+            QueryResult::Skipped(incl) => incl,
+            QueryResult::Exact(dist) => Inclusion::from_dist(dist),
+        }
+    }
+
+    pub fn is_inside(&self) -> bool {
+        self.inclusion().is_inside()
+    }
+
+    pub fn is_outside(&self) -> bool {
+        self.inclusion().is_outside()
+    }
+
+    pub fn dist(&self) -> Option<f32> {
+        match *self {
+            QueryResult::Skipped(_) => None,
+            QueryResult::Exact(dist) => Some(dist),
+        }
+    }
 }
 
 impl DistMap {
     pub fn new(span: Span, shape: &Shape, resolution: u32) -> Self {
         assert!(resolution.is_power_of_two());
+        assert!(resolution >= SECTIONS);
 
-        fn gen(mut node: NodeEntryMut<NodeState, ()>, shape: &Shape, res: u32) {
-            // If our resolution is still bigger, we want to split the node
-            if res > LEAF_SIZE {
-                node.split(None);
-                for child in node.into_children().unwrap() {
-                    gen(child, shape, res / 2);
-                }
+        let chunk_res = resolution / SECTIONS;
+        let chunk_span_size = (span.end - span.start) / SECTIONS as f32;
+        let chunk_radius = chunk_span_size.magnitude() / 2.0;
+
+        /// We prepare both data arrays. The lookup array has exactly
+        /// 8^NUM_SPLITS elements. We can't really say anything about the size
+        /// of the array holding the exact values.
+        let mut lookup = Vec::with_capacity(8usize.pow(NUM_SPLITS));
+        let mut dists = Vec::new();
+
+        for (x, y, z) in iter::cube(SECTIONS) {
+            let chunk_start = span.start + Vector3::new(x, y, z)
+                .cast::<f32>()
+                .mul_element_wise(chunk_span_size);
+            let chunk_center = chunk_start + chunk_span_size / 2.0;
+
+            let center_dist = shape.min_distance_from(chunk_center);
+            //
+            if (center_dist * 1.0).abs() > chunk_radius {
+                lookup.push(BoxState::Skipped(Inclusion::from_dist(center_dist)));
             } else {
-                // We won't split the node anymore, but generate the leaf data
-                // for it now.
-                let span = node.span();
-                let dists = GridTable::fill_with(res, |x, y, z| {
-                    let v = Vector3::new(x, y, z).cast::<f32>() / (res as f32);
-                    let p = span.start + (span.end - span.start).mul_element_wise(v);
 
-                    shape.min_distance_from(p)
-                });
-                *node.leaf_data_mut().unwrap() = Some(NodeState::Exact(dists));
+                // We will fill in all distances for the current box, so we need
+                // more space in the `dists` array.
+                dists.reserve((chunk_res as usize).pow(3));
+                let idx = dists.len();
+
+                for (x, y, z) in iter::cube(chunk_res) {
+                    let v = Vector3::new(x, y, z).cast::<f32>() / (chunk_res as f32);
+                    let p = chunk_start + chunk_span_size.mul_element_wise(v);
+
+                    dists.push(shape.min_distance_from(p));
+                }
+
+                lookup.push(BoxState::Exact(idx as u32));
             }
         }
 
-        let mut tree = Octree::spanning(span);
-        gen(tree.root_mut(), shape, resolution);
-
         DistMap {
-            tree: tree,
+            lookup: lookup.into_boxed_slice(),
+            dists: dists.into_boxed_slice(),
             resolution: resolution,
+            num_low_bits: (resolution.trailing_zeros() - NUM_SPLITS) as u8,
+            chunk_len: chunk_res.pow(3),
+            mask_low_bits: (resolution >> NUM_SPLITS) - 1,
         }
     }
 
-    pub fn at(&self, (mut x, mut y, mut z): (u32, u32, u32)) -> Result<f32, Inclusion> {
+    pub fn at(&self, (x, y, z): (u32, u32, u32)) -> QueryResult {
         assert!(x < self.resolution);
         assert!(y < self.resolution);
         assert!(z < self.resolution);
 
-        // First we have to find the corresponding node in our octree. We do
-        // this by choosing the correct node each level and carry a few values
-        // with us while doing so.
+
+        // To calculate the index in `lookup` we take bits from x, y and z:
         //
-        // The `shift` value stores the number of binary digits on the right of
-        // x/y/z which we are not interested in.
-        // E.g. `resolution` is 64 (100_0000 in binary). As x/y/z need to be
-        // smaller then the resolution, they have at most the rightmost six
-        // bits set. In the first step of choosing the node, we are only
-        // interested in the first of those six digits (thus, `shift` is 5). In
-        // the next step we will have discarded this first digit (it's 0) and
-        // are interested in the second of those six digits (`shift` is 4).
+        //     idx = 0bxxyyzz;
         //
-        // x/y/z will be mutated to always describe the grid coordinate in the
-        // current node!
-        let mut shift = self.resolution.trailing_zeros() - 1;
-        let mut node = self.tree.root();
+        // We use NUM_SPLITS bits per dimension. This results in
+        // 2^(3 * NUM_SPLITS) = 8^NUM_SPLITS possible indices.
+        //
+        // `resolution` is a power of two, so its bit pattern looks like
+        // b100_0000 (for resolution = 64). The number of trailing zeros is 6,
+        // which is saved in `num_bits`. We only look at the last `num_bits`
+        // bits of x/y/z; the other ones have to be 0 anyway (note the asserts
+        // above).
+        //
+        // Of these `num_bits` bits of x/y/z we use the NUM_SPLITS most
+        // significant ones to index `lookup`.
+        let xb = x >> self.num_low_bits;
+        let yb = y >> self.num_low_bits;
+        let zb = z >> self.num_low_bits;
+        let idx = (xb << (2 * NUM_SPLITS)) | (yb << NUM_SPLITS) | zb;
+        // println!("{}", idx);
 
-        // Here we walk down the tree until we found a leaf (containing our
-        // precious data).
-        while !node.is_leaf() {
-            // To find the right one of the eight children, we need to look at
-            // a specific digit of the binary representation of x/y/z. The
-            // digit we are looking at is determined by `shift` and is the
-            // leftmost digit which is possibly set. Thus, to isolate it, we
-            // only have to left shift by `shift`.
-            let xb = x >> shift;
-            let yb = y >> shift;
-            let zb = z >> shift;
+        match self.lookup[idx as usize] {
+            BoxState::Skipped(incl) => QueryResult::Skipped(incl),
+            BoxState::Exact(offset) => {
+                let offset = offset as usize;
+                let curr_box = &self.dists[offset..offset + self.chunk_len as usize];
 
-            // Those single bits are no combined into a three bit number which
-            // is then used to index the children array. Look at the
-            // documentation for `Octnode` to understand why we need to combine
-            // the bits in this way (x being the most significant).
-            let idx = (xb << 2 | yb << 1 | zb) as u8;
+                // Now we need to index this second array by using the
+                // remaining bits of x/y/z.
+                let xb = x & self.mask_low_bits;
+                let yb = y & self.mask_low_bits;
+                let zb = z & self.mask_low_bits;
+                let inner_idx = (xb << (2 * self.num_low_bits))
+                    | (yb << self.num_low_bits)
+                    | zb;
 
-            // Both of these unwraps are safe: the loop condition already tells
-            // us that this node is not a leaf node, thus has children. And
-            // through all of the reasoning above we can see that xb/yb/zb are
-            // either 1 or 0 and that idx can't be bigger than 7 in that case.
-            node = node.child(idx).unwrap();
+                // if inner_idx == 4096 {
+                //     println!("{:?} => {:?}", (x, y, z), (xb, yb, zb));
+                // }
 
-            // We need to adjust our shift value and the coordinates. We just
-            // cut off the bit we were just looking at.
-            //
-            // E.g. this is the first loop iteration, resolution is 64 and x
-            // is 40 (0b101000). As discussed above, `shift` is 5 now. We just
-            // looked at the most significant bit of x and want to cut it off.
-            //
-            //     mask = (1 << shift) - 1 = 0b100000 - 1 = 0b11111
-            //
-            // With this mask, we will set the MSB to 0.
-            let mask = (1 << shift) - 1;
-            x &= mask;
-            y &= mask;
-            z &= mask;
-            shift -= 1;
+                QueryResult::Exact(curr_box[inner_idx as usize])
+            }
         }
 
-        match *node.leaf_data().unwrap() {
-            NodeState::Skipped(incl) => Err(incl),
-            NodeState::Exact(ref data) => Ok(data[(x, y, z)]),
-        }
     }
 
     pub fn inclusion_at(&self, coords: (u32, u32, u32)) -> Inclusion {
-        self.at(coords)
-            .map(Inclusion::from_dist)
-            .unwrap_or_else(|i| i)
+        self.at(coords).inclusion()
     }
 }
 
 
-enum NodeState {
-    Skipped(Inclusion),
-    Exact(GridTable<f32>),
-}
+// enum NodeState {
+//     Skipped(Inclusion),
+//     Exact(GridTable<f32>),
+// }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Inclusion {
@@ -145,7 +189,11 @@ impl Inclusion {
         }
     }
 
-    // pub fn is_inside(&self) -> bool {
-    //     *self == Inclusion::Inside
-    // }
+    pub fn is_inside(&self) -> bool {
+        *self == Inclusion::Inside
+    }
+
+    pub fn is_outside(&self) -> bool {
+        *self == Inclusion::Outside
+    }
 }

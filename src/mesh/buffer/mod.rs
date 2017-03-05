@@ -160,25 +160,34 @@ impl MeshBuffer {
 
             // The estimated minimal distances of all eight corners calculated
             // in the prior step.
-            let grid_coords = [
-                (x    , y    , z    ),
-                (x    , y    , z + 1),
-                (x    , y + 1, z    ),
-                (x    , y + 1, z + 1),
-                (x + 1, y    , z    ),
-                (x + 1, y    , z + 1),
-                (x + 1, y + 1, z    ),
-                (x + 1, y + 1, z + 1),
-            ];
-            let distances = [
-                dists.at((x    , y    , z    )).unwrap(),
-                dists.at((x    , y    , z + 1)).unwrap(),
-                dists.at((x    , y + 1, z    )).unwrap(),
-                dists.at((x    , y + 1, z + 1)).unwrap(),
-                dists.at((x + 1, y    , z    )).unwrap(),
-                dists.at((x + 1, y    , z + 1)).unwrap(),
-                dists.at((x + 1, y + 1, z    )).unwrap(),
-                dists.at((x + 1, y + 1, z + 1)).unwrap(),
+            // let grid_coords = [
+            //     (x    , y    , z    ),
+            //     (x    , y    , z + 1),
+            //     (x    , y + 1, z    ),
+            //     (x    , y + 1, z + 1),
+            //     (x + 1, y    , z    ),
+            //     (x + 1, y    , z + 1),
+            //     (x + 1, y + 1, z    ),
+            //     (x + 1, y + 1, z + 1),
+            // ];
+            let query_results = [
+                // dists.at(grid_coords[0]).unwrap(),
+                // dists.at(grid_coords[1]).unwrap(),
+                // dists.at(grid_coords[2]).unwrap(),
+                // dists.at(grid_coords[3]).unwrap(),
+                // dists.at(grid_coords[4]).unwrap(),
+                // dists.at(grid_coords[5]).unwrap(),
+                // dists.at(grid_coords[6]).unwrap(),
+                // dists.at(grid_coords[7]).unwrap(),
+
+                dists.at((x    , y    , z    )),
+                dists.at((x    , y    , z + 1)),
+                dists.at((x    , y + 1, z    )),
+                dists.at((x    , y + 1, z + 1)),
+                dists.at((x + 1, y    , z    )),
+                dists.at((x + 1, y    , z + 1)),
+                dists.at((x + 1, y + 1, z    )),
+                dists.at((x + 1, y + 1, z + 1)),
                 // dists[(x    , y    , z    )],
                 // dists[(x    , y    , z + 1)],
                 // dists[(x    , y + 1, z    )],
@@ -193,8 +202,8 @@ impl MeshBuffer {
             // shape (if the cell intersects the shape's surface). If that's
             // not the case, we won't generate a vertex for this cell.
             let partially_in = !(
-                distances.iter().all(|&d| d < 0.0) ||
-                distances.iter().all(|&d| d > 0.0)
+                query_results.iter().all(|qr| qr.is_inside()) ||
+                query_results.iter().all(|qr| qr.is_outside())
             );
 
             if !partially_in {
@@ -244,7 +253,7 @@ impl MeshBuffer {
                 // distances have different signs ("minus" means: inside the
                 // shape).
                 .filter(|&(from, to)| {
-                    distances[from].signum() != distances[to].signum()
+                    query_results[from].inclusion() != query_results[to].inclusion()
                 })
 
                 // Next, we convert the edge into a vertex on said edge. We
@@ -258,10 +267,10 @@ impl MeshBuffer {
                     //
                     // Remember: we already know that both distances have
                     // different signs!
-                    let (d_from, d_to) = if distances[from] < 0.0 {
-                        (distances[from], distances[to])
+                    let (d_from, d_to) = if query_results[from].is_inside() {
+                        (query_results[from].dist().unwrap_or(0.0), query_results[to].dist().unwrap_or(0.0))
                     } else {
-                        (-distances[from], -distances[to])
+                        (-query_results[from].dist().unwrap_or(0.0), -query_results[to].dist().unwrap_or(0.0))
                     };
 
                     // This condition is only true if `d_from == -0.0`. In
@@ -431,56 +440,56 @@ impl MeshBuffer {
 
 
 
-// mod benchi {
-//     extern crate test;
+mod benchi {
+    extern crate test;
 
-//     use self::test::Bencher;
-//     use super::*;
-//     use core::shape::Mandelbulb;
+    use self::test::Bencher;
+    use super::*;
+    use core::shape::Mandelbulb;
 
-//     #[bench]
-//     fn bench_mandelbulb_10(b: &mut Bencher) {
-//         let shape = Mandelbulb::classic(5, 2.5);
-//         b.iter(|| MeshBuffer::generate_for_box(
-//             &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-//             &shape,
-//             10,
-//         ))
-//     }
+    #[bench]
+    fn bench_mandelbulb_10(b: &mut Bencher) {
+        let shape = Mandelbulb::classic(5, 2.5);
+        b.iter(|| MeshBuffer::generate_for_box(
+            &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+            &shape,
+            16,
+        ))
+    }
 
-//     // #[bench]
-//     // fn bench_mandelbulb_25(b: &mut Bencher) {
-//     //     let shape = Mandelbulb::classic(5, 2.5);
-//     //     b.iter(|| MeshBuffer::generate_for_box(
-//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-//     //         &shape,
-//     //         25,
-//     //     ))
-//     // }
+    // #[bench]
+    // fn bench_mandelbulb_25(b: &mut Bencher) {
+    //     let shape = Mandelbulb::classic(5, 2.5);
+    //     b.iter(|| MeshBuffer::generate_for_box(
+    //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+    //         &shape,
+    //         25,
+    //     ))
+    // }
 
-//     // #[bench]
-//     // fn bench_mandelbulb_50(b: &mut Bencher) {
-//     //     let shape = Mandelbulb::classic(5, 2.5);
-//     //     b.iter(|| MeshBuffer::generate_for_box(
-//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-//     //         &shape,
-//     //         50,
-//     //     ))
-//     // }
+    // #[bench]
+    // fn bench_mandelbulb_50(b: &mut Bencher) {
+    //     let shape = Mandelbulb::classic(5, 2.5);
+    //     b.iter(|| MeshBuffer::generate_for_box(
+    //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
+    //         &shape,
+    //         50,
+    //     ))
+    // }
 
-//     #[bench]
-//     fn classic_5(b: &mut Bencher) {
-//         let shape = Mandelbulb::classic(5, 2.5);
-//         let points = [
-//             Point3::new(0.0, 0.0, 0.0),
-//             Point3::new(1.0, 0.0, 0.0),
-//             Point3::new(0.0, 1.0, 0.0),
-//             Point3::new(0.0, 0.0, 1.0),
-//             Point3::new(0.3, 0.3, 0.4),
-//         ];
+    #[bench]
+    fn classic_5(b: &mut Bencher) {
+        let shape = Mandelbulb::classic(5, 2.5);
+        let points = [
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+            Point3::new(0.3, 0.3, 0.4),
+        ];
 
-//         b.iter(|| {
-//             points.iter().map(|&p| shape.min_distance_from(p)).sum::<f32>()
-//         })
-//     }
-// }
+        b.iter(|| {
+            points.iter().map(|&p| shape.min_distance_from(p)).sum::<f32>()
+        })
+    }
+}

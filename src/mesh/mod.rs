@@ -105,6 +105,7 @@ impl ShapeMesh {
             }
         }
         let jobs_before = self.active_jobs;
+        let finished_jobs_before = self.finished_jobs;
 
         // Collect generated meshes and prepare them for rendering.
         for (center, (buf, timings)) in self.new_meshes.try_iter() {
@@ -169,7 +170,9 @@ impl ShapeMesh {
             trace!("Currently active sample jobs: {}", self.active_jobs);
 
             const PRINT_EVERY_FINISHED_JOBS: u64 = 64;
-            if self.finished_jobs % PRINT_EVERY_FINISHED_JOBS == 0 && self.finished_jobs > 0 {
+            if self.finished_jobs % PRINT_EVERY_FINISHED_JOBS == 0
+                && self.finished_jobs > 0
+                && finished_jobs_before != self.finished_jobs {
                 debug!(
                     "Finished {} new jobs in: {}",
                     PRINT_EVERY_FINISHED_JOBS,
