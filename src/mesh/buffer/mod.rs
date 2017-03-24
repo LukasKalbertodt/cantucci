@@ -324,14 +324,6 @@ impl MeshBuffer {
 
                     let normal = {
                         let delta = 1.0 * (span.end - span.start) / resolution as f32;
-                        // Vector3::new(
-                        //     shape.min_distance_from(p + Vector3::unit_x() * delta.x)
-                        //         - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
-                        //     shape.min_distance_from(p + Vector3::unit_y() * delta.y)
-                        //         - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
-                        //     shape.min_distance_from(p + Vector3::unit_z() * delta.z)
-                        //         - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
-                        // ).normalize()
 
                         let v = Vector3::new(
                             interpolate(p + Vector3::unit_x() * delta.x, &dists, corners[0], corners[7])
@@ -343,14 +335,23 @@ impl MeshBuffer {
                         );
                         if v.magnitude() == 0.0 {
 
-                            println!("{:?}", v);
-                            println!("dists: {:#?}", dists);
+                            // println!("{:?}", v);
+                            // println!("dists: {:#?}", dists);
+                            println!("---------------");
+                            println!("p={:?}", p);
                             println!("samples: {:#?}", samples);
                             // panic!();
+                            Vector3::new(
+                                shape.min_distance_from(p + Vector3::unit_x() * delta.x)
+                                    - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
+                                shape.min_distance_from(p + Vector3::unit_y() * delta.y)
+                                    - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
+                                shape.min_distance_from(p + Vector3::unit_z() * delta.z)
+                                    - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
+                            ).normalize()
+                        } else {
+                            v.normalize()
                         }
-
-                        v.normalize()
-
 
                         // Vector3::new(1.0, 0.0, 0.0)
                     };
