@@ -1,8 +1,8 @@
 use glium::glutin::Event;
 
 use camera::{Camera, Projection};
-use core::math::*;
-use core::Shape;
+use math::*;
+use shape::Shape;
 use event::{EventHandler, EventResponse};
 use super::CamControl;
 

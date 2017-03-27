@@ -2,8 +2,8 @@ use glium::backend::glutin_backend::GlutinFacade;
 use glium::glutin::{CursorState, Event};
 
 use camera::{Camera, Projection};
-use core::math::*;
-use core::Shape;
+use math::*;
+use shape::Shape;
 use event::{EventHandler, EventResponse};
 use super::CamControl;
 

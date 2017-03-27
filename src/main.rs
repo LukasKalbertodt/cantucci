@@ -10,7 +10,6 @@
 #[macro_use] extern crate log;
 extern crate arrayvec;
 extern crate cgmath;
-extern crate core;
 extern crate env_logger;
 extern crate num_cpus;
 extern crate term_painter;
@@ -23,8 +22,10 @@ mod control;
 mod env;
 mod errors;
 mod event;
+mod math;
 mod mesh;
 mod octree;
+mod shape;
 mod util;
 
 

@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 use std::fmt;
 use std::ops;
 
-use core::math::*;
-use core::Shape;
+use math::*;
+use shape::Shape;
 use octree::Span;
 use util::ToArr;
 use util::iter::cube;

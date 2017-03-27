@@ -7,8 +7,8 @@ use std::sync::Arc;
 use threadpool::ThreadPool;
 
 use camera::Camera;
-use core::math::*;
-use core::Shape;
+use math::*;
+use shape::Shape;
 use env::Environment;
 use errors::*;
 use octree::{DebugView, Octree, SpanExt};

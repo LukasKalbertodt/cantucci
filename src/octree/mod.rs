@@ -1,7 +1,7 @@
 use arrayvec::ArrayVec;
 use std::ops::Range;
 
-use core::math::*;
+use math::*;
 
 mod iter;
 mod debug_view;
