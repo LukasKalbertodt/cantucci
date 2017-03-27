@@ -14,7 +14,6 @@ use util::time::DurationExt;
 pub struct MeshBuffer {
     raw_vbuf: Vec<Vertex>,
     raw_ibuf: Vec<u32>,
-    // resolution: u32, // TODO: use or delete
 }
 
 impl MeshBuffer {
@@ -238,7 +237,7 @@ impl MeshBuffer {
             let dist_p = shape.min_distance_from(p);
 
             let normal = {
-                let delta = 0.01 * (span.end - span.start) / resolution as f32;
+                let delta = 0.7 * (span.end - span.start) / resolution as f32;
                 Vector3::new(
                     shape.min_distance_from(p + Vector3::unit_x() * delta.x)
                         - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),

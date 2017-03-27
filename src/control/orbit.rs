@@ -24,7 +24,6 @@ const ZOOM_SPEED: f32 = 1.0;
 /// Offers orbital control around a fixed origin point.
 pub struct Orbit {
     origin: Point3<f32>,
-    distance: f32,  // TODO: this can be calculated from the camera as well ...
     cam: Camera,
 
     // These four values are used for smooth rotations. The `speed` values
@@ -50,7 +49,6 @@ impl Orbit {
 
         Orbit {
             origin: origin,
-            distance: distance,
             cam: Camera::new(origin + -(init_dir * distance), init_dir, proj),
             theta_speed: Rad(0.0),
             theta_accel: Rad(0.0),
@@ -60,9 +58,12 @@ impl Orbit {
         }
     }
 
+    fn distance(&self) -> f32 {
+        (self.cam.position - self.origin).magnitude()
+    }
+
     fn update_distance(&mut self, distance: f32) {
-        self.distance = distance;
-        self.cam.position = self.origin + self.distance * -self.cam.direction();
+        self.cam.position = self.origin + distance * -self.cam.direction();
     }
 }
 
@@ -95,11 +96,11 @@ impl CamControl for Orbit {
         phi += self.phi_speed * delta;
 
         self.cam.look_at_sphere(theta, phi);
-        self.cam.position = self.origin + self.distance * -self.cam.direction();
+        self.cam.position = self.origin + self.distance() * -self.cam.direction();
 
         // Update distance from origin
         let rate_of_change = self.zoom_speed * delta;
-        let new_distance = self.distance * 2.0f32.powf(rate_of_change);
+        let new_distance = self.distance() * 2.0f32.powf(rate_of_change);
         self.update_distance(new_distance);
     }
 
@@ -110,7 +111,6 @@ impl CamControl for Orbit {
     fn match_view(&mut self, other: &Camera) {
         let view_dir = self.origin - other.position;
         self.cam.look_in(view_dir);
-        self.distance = view_dir.magnitude();
         self.cam.position = other.position;
     }
 }

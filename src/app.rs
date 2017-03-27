@@ -6,8 +6,6 @@ use control::Fly as FlyControl;
 use control::Orbit as OrbitControl;
 use control::{CamControl, KeySwitcher};
 use core::math::*;
-// TODO: remove attribute once Shape can be used as trait object (see #18)
-#[allow(unused_imports)]
 use core::shape::{Shape, Mandelbulb, Sphere};
 use env::Environment;
 use errors::*;
@@ -42,7 +40,7 @@ impl App {
 
         let proj = Projection::new(
             Rad(1.0),
-            0.000_2 .. 10.0,
+            0.000_04 .. 10.0,
             facade.get_framebuffer_dimensions(),
         );
 
