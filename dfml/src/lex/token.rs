@@ -48,23 +48,13 @@ macro_rules! gen_enum {
     }
 }
 
-macro_rules! to_java_string {
+macro_rules! as_str {
     ($name:ident; $($variant:ident = $val:expr),+) => {
         impl $name {
-            pub fn as_java_string(&self) -> &str {
+            pub fn as_str(&self) -> &'static str {
                 match self {
                     $( &$name::$variant => $val ,)*
                 }
-            }
-        }
-    }
-}
-
-macro_rules! into_str {
-    ($name:ident; $($variant:ident = $val:expr),+) => {
-        impl Into<String> for $name {
-            fn into(self) -> String {
-                self.as_java_string().into()
             }
         }
     }
@@ -74,7 +64,7 @@ macro_rules! display {
     ($name:ident; $($variant:ident = $val:expr),+) => {
         impl Display for $name {
             fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-                self.as_java_string().fmt(f)
+                self.as_str().fmt(f)
             }
         }
     }
@@ -115,13 +105,34 @@ pub enum Token<'src> {
     ColonColon,
 }
 
+impl<'src> Token<'src> {
+    pub fn as_str(&self) -> &'src str {
+        use self::Token::*;
+
+        match *self {
+            Ident(ident) => ident,
+            Keyword(kw) => kw.as_str(),
+            ParenOp => "(",
+            ParenCl => ")",
+            BraceOp => "{",
+            BraceCl => "}",
+            BracketOp => "[",
+            BracketCl => "]",
+            Semi => ";",
+            Comma => ",",
+            Dot => ".",
+            Colon => ":",
+            ColonColon => "::",
+        }
+    }
+}
 
 
 gen_enum! {
     /// Represents a keyword
     #[derive(Copy, Clone, PartialEq, Eq, Debug)]
     pub enum Keyword;
-    with to_java_string, display, from_str, into_str for:
+    with as_str, display, from_str for:
 
     Shape = "shape",
     Param = "param"

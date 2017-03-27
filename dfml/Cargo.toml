@@ -13,6 +13,7 @@ path = "dfmlc/main.rs"
 lalrpop-util = "0.12.5"
 log = "0.3.7"
 term-painter = "0.2.3"
+error-chain = "0.10.0"
 
 [build-dependencies]
 lalrpop = "0.12.5"

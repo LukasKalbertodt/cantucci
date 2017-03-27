@@ -15,19 +15,12 @@ use base::{FileMap, Span, SrcOffset, BytePos};
 use diag;
 pub use self::token::{Token, TokenSpan, Keyword};
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ErrorKind {
-    IllegalChar(char),
-}
 
 /// Type returned by the `Lexer` in case of a lexing error. Contains a
 /// detailed report and may contain a poisoned token that could be used to
 /// proceed normally.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Error<P> {
-    /// Error kind to handle different kinds of errors.
-    pub kind: ErrorKind,
-
     /// Detailed information about the error. Intended for user-friendly
     /// compiler messages.
     pub report: diag::Report,
@@ -44,7 +37,6 @@ impl<P> Error<P> {
         where F: FnOnce(P) -> U
     {
         Error {
-            kind: self.kind,
             report: self.report,
             poison: self.poison.map(op),
         }
@@ -55,7 +47,6 @@ impl<P> Error<P> {
         where F: FnOnce(diag::Report) -> diag::Report
     {
         Error {
-            kind: self.kind,
             report: op(self.report),
             poison: self.poison,
         }
@@ -70,8 +61,8 @@ fn map_both<T, U, F>(res: Result<T, T>, op: F) -> Result<U, U>
 {
     match res {
         Ok(t) => Ok(op(t)),
-        Err(Error { kind, report, poison }) =>
-            Err(Error { kind: kind, report: report, poison: poison.map(op) }),
+        Err(Error { report, poison }) =>
+            Err(Error { report: report, poison: poison.map(op) }),
     }
 }
 
@@ -261,7 +252,6 @@ impl<'src> Lexer<'src> {
             // If you reach this: congratz!
             c => {
                 return Some(Err(Error {
-                    kind: ErrorKind::IllegalChar(c),
                     report: diag::Report::simple_error(
                         "illegal character in this context",
                         self.curr_span()
@@ -317,12 +307,10 @@ impl<'src> Lexer<'src> {
 
     fn simple_error<P, S: Into<String>>(
         &self,
-        kind: ErrorKind,
         poison: P,
         msg: S,
     ) -> Error<P> {
         Error {
-            kind: kind,
             report: diag::Report::simple_error(msg, self.curr_span()),
             poison: Some(poison),
         }

@@ -1,8 +1,9 @@
 use lex::{Token, Lexer, Keyword};
 use base::{Span, Spanned, BytePos};
 use ast;
+use diag::Report;
 
-grammar<'src>;
+grammar<'src>(errors: &mut Vec<Report>);
 
 
 #[inline]
@@ -33,6 +34,7 @@ Param: ast::Param<'src> = {
             span: Span::new(l, r),
             name: name,
             ty: ty,
+            default_value: None,
         }
     }
 };
@@ -41,7 +43,7 @@ Ty: ast::Ty<'src> = <Ident> => ast::Ty { name: <> };
 
 extern {
     type Location = BytePos;
-    type Error = ();
+    type Error = Report;
 
     enum Token<'src> {
         RawIdent => Token::Ident(<&'src str>),

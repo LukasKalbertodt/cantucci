@@ -1,0 +1,3 @@
+shae Sphere {
+    param RADIUS: Float;
+}

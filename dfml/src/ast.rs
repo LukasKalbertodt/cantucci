@@ -11,6 +11,7 @@ pub struct Param<'src> {
     pub span: Span,
     pub name: Ident<'src>,
     pub ty: Ty<'src>,
+    pub default_value: Option<()>,
 }
 
 #[derive(Clone, Debug)]
