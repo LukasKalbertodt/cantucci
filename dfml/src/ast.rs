@@ -1,17 +1,25 @@
 use base::Span;
 
+#[derive(Clone, Debug)]
 pub struct ShapeDef<'src> {
-    name: &'src str,
-    params: Vec<Param<'src>>,
+    pub name: Ident<'src>,
+    pub params: Vec<Param<'src>>,
 }
 
-struct Param<'src> {
-    span: Span,
-    name: &'src str,
-    ty: Ty<'src>,
+#[derive(Clone, Debug)]
+pub struct Param<'src> {
+    pub span: Span,
+    pub name: Ident<'src>,
+    pub ty: Ty<'src>,
 }
 
-struct Ty<'src> {
-    span: Span,
-    name: &'src str,
+#[derive(Clone, Debug)]
+pub struct Ty<'src> {
+    pub name: Ident<'src>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Ident<'src> {
+    pub span: Span,
+    pub name: &'src str,
 }

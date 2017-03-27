@@ -13,7 +13,7 @@ use std::ascii::AsciiExt;
 
 use base::{FileMap, Span, SrcOffset, BytePos};
 use diag;
-use self::token::{Token, TokenSpan, Keyword};
+pub use self::token::{Token, TokenSpan, Keyword};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ErrorKind {

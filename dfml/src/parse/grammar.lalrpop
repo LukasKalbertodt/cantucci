@@ -1,0 +1,68 @@
+use lex::{Token, Lexer, Keyword};
+use base::{Span, Spanned, BytePos};
+use ast;
+
+grammar<'src>;
+
+
+#[inline]
+Spanned<T>: Spanned<T> = {
+    <l:@L> <t:T> <r:@R> => Spanned { data: t, span: Span::new(l, r) },
+};
+
+#[inline]
+Ident: ast::Ident<'src> = {
+    <w: Spanned<RawIdent>> => ast::Ident {
+        name: w.data,
+        span: w.span,
+     }
+};
+
+pub ShapeDef: ast::ShapeDef<'src> = {
+    "shape" <name: Ident> "{" <params: Param*>"}" => {
+        ast::ShapeDef {
+            name: name,
+            params: params,
+        }
+    }
+};
+
+Param: ast::Param<'src> = {
+    <l: @L> "param" <name: Ident> ":" <ty: Ty> ";" <r: @R>  => {
+        ast::Param {
+            span: Span::new(l, r),
+            name: name,
+            ty: ty,
+        }
+    }
+};
+
+Ty: ast::Ty<'src> = <Ident> => ast::Ty { name: <> };
+
+extern {
+    type Location = BytePos;
+    type Error = ();
+
+    enum Token<'src> {
+        RawIdent => Token::Ident(<&'src str>),
+        // Literal => Token::Literal(<lex::Lit>),
+
+        // Keywords
+        "param" => Token::Keyword(Keyword::Param),
+        "shape" => Token::Keyword(Keyword::Shape),
+
+        // Some kind of separator
+        // (   )   {   }   [   ]   ;   ,   .   :   ::
+        "(" => Token::ParenOp,
+        ")" => Token::ParenCl,
+        "{" => Token::BraceOp,
+        "}" => Token::BraceCl,
+        "[" => Token::BracketOp,
+        "]" => Token::BracketCl,
+        ";" => Token::Semi,
+        "," => Token::Comma,
+        "." => Token::Dot,
+        ":" => Token::Colon,
+        "::" => Token::ColonColon,
+    }
+}

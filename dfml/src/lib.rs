@@ -6,6 +6,7 @@ mod ast;
 pub mod lex;
 pub mod base;
 mod diag;
+pub mod parse;
 
 use std::path::Path;
 
