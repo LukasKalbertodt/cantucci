@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use math::*;
 use super::Shape;
 
@@ -43,6 +45,12 @@ impl Shape for Mandelbulb {
         // The point didn't diverge within `max_iters`, so we assume it's in
         // the set
         true
+    }
+
+    fn bounding_box(&self) -> Range<Point3<f32>> {
+        // TODO: This value was found by experimenting... we should prove this
+        // value
+        Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
     }
 
     fn min_distance_from(&self, p: Point3<f32>) -> f32 {

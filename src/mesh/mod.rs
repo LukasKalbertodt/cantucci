@@ -55,10 +55,7 @@ impl ShapeMesh {
     pub fn new<F: Facade>(facade: &F, shape: Arc<Shape>) -> Result<Self> {
         // Setup an empty tree and split the first two levels which results in
         // 8² = 64 children
-        let mut tree = Octree::spanning(
-            // TODO: let the shape tell us the bounding box
-            Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
-        );
+        let mut tree = Octree::spanning(shape.bounding_box());
         let _ = tree.root_mut().split(None);
         for mut child in tree.root_mut().into_children().unwrap() {
             child.split(None);

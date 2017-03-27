@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use math::*;
 
 #[macro_use]
@@ -31,6 +33,8 @@ pub trait Shape: Sync + Send + 'static {
     /// This also implies that min_distance_from(p) can only return 0 iff p
     /// lies on the shape's surface.
     fn min_distance_from(&self, p: Point3<f32>) -> f32;
+
+    fn bounding_box(&self) -> Range<Point3<f32>>;
 
     // TODO: this method is hacky...
     /// Returns a string containing the GLSL definition of the distance
