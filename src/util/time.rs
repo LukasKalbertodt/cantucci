@@ -19,6 +19,6 @@ impl fmt::Display for DisplayMs {
         let nanos = self.0.subsec_nanos();
 
         let ms = (secs as f64) * 1000.0 + ((nanos / 1000) as f64 / 1000.0);
-        format!("{}ms", ms).fmt(f)
+        format!("{:.3}ms", ms).fmt(f)
     }
 }

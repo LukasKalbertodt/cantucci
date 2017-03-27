@@ -10,52 +10,6 @@ use util::iter::cube;
 use util::grid::GridTable;
 use util::time::DurationExt;
 
-// mod dist_map;
-
-// use self::dist_map::DistMap;
-
-
-#[derive(Copy, Clone)]
-pub struct Vertex {
-    position: [f32; 3],
-    normal: [f32; 3],
-    distance_from_surface: f32,
-}
-
-implement_vertex!(Vertex, position, normal, distance_from_surface);
-
-#[derive(Default, Clone, Copy)]
-pub struct Timings {
-    first: Duration,
-    second: Duration,
-    third: Duration,
-}
-
-impl fmt::Display for Timings {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let all = self.first + self.second + self.third;
-        write!(
-            f,
-            "{:>11} ({:>11}, {:>11}, {:>11})",
-            all.display_ms(),
-            self.first.display_ms(),
-            self.second.display_ms(),
-            self.third.display_ms(),
-        )
-    }
-}
-
-impl ops::Add for Timings {
-    type Output = Self;
-    fn add(self, other: Self) -> Self {
-        Timings {
-            first: self.first + other.first,
-            second: self.second + other.second,
-            third: self.third + other.third,
-        }
-    }
-}
-
 
 pub struct MeshBuffer {
     raw_vbuf: Vec<Vertex>,
@@ -282,19 +236,17 @@ impl MeshBuffer {
             // Now we only calculate some meta data which might be used to
             // color the vertex.
             let dist_p = shape.min_distance_from(p);
-            let dist_p = 0.0;
 
             let normal = {
-                // let delta = 0.01 * (span.end - span.start) / resolution as f32;
-                // Vector3::new(
-                //     shape.min_distance_from(p + Vector3::unit_x() * delta.x)
-                //         - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
-                //     shape.min_distance_from(p + Vector3::unit_y() * delta.y)
-                //         - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
-                //     shape.min_distance_from(p + Vector3::unit_z() * delta.z)
-                //         - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
-                // ).normalize()
-                Vector3::new(1.0, 0.0, 0.0)
+                let delta = 0.01 * (span.end - span.start) / resolution as f32;
+                Vector3::new(
+                    shape.min_distance_from(p + Vector3::unit_x() * delta.x)
+                        - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
+                    shape.min_distance_from(p + Vector3::unit_y() * delta.y)
+                        - shape.min_distance_from(p +  Vector3::unit_y() * -delta.y),
+                    shape.min_distance_from(p + Vector3::unit_z() * delta.z)
+                        - shape.min_distance_from(p +  Vector3::unit_z() * -delta.z),
+                ).normalize()
             };
 
             raw_vbuf.push(Vertex {
@@ -372,12 +324,14 @@ impl MeshBuffer {
             first: before_second - before_first,
             second: before_third - before_second,
             third: after_third -  before_third,
+            vertices: raw_vbuf.len() as u32,
+            faces: raw_ibuf.len() as u32 / 6,
         };
 
         trace!(
-            "Generated {:5} points, {:5} triangles in {}",
+            "Generated {:6} points, {:6} faces in {}",
             raw_vbuf.len(),
-            raw_ibuf.len() / 3,
+            raw_ibuf.len() / 6,
             timings,
         );
 
@@ -385,7 +339,6 @@ impl MeshBuffer {
             MeshBuffer {
                 raw_vbuf: raw_vbuf,
                 raw_ibuf: raw_ibuf,
-                // resolution: resolution,  // TODO: use or delete
             },
             timings
         )
@@ -398,12 +351,59 @@ impl MeshBuffer {
     pub fn raw_ibuf(&self) -> &[u32] {
         &self.raw_ibuf
     }
-
-    // TODO: use or delete
-    // pub fn resolution(&self) -> u32 {
-    //     self.resolution
-    // }
 }
+
+
+/// Stores some information about how long various passes of the mesh
+/// generation algorithm were running as well as how many vertices and faces
+/// were created.
+#[derive(Default, Clone, Copy)]
+pub struct Timings {
+    first: Duration,
+    second: Duration,
+    third: Duration,
+    vertices: u32,
+    faces: u32,
+}
+
+impl fmt::Display for Timings {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let all = self.first + self.second + self.third;
+        write!(
+            f,
+            "{:>11} ({:>11}, {:>11}, {:>11}) => [{:6} verts, {:6} faces]",
+            all.display_ms(),
+            self.first.display_ms(),
+            self.second.display_ms(),
+            self.third.display_ms(),
+            self.vertices,
+            self.faces,
+        )
+    }
+}
+
+impl ops::Add for Timings {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Timings {
+            first: self.first + other.first,
+            second: self.second + other.second,
+            third: self.third + other.third,
+            vertices: self.vertices + other.vertices,
+            faces: self.faces + other.faces,
+        }
+    }
+}
+
+/// Per vertex data in the generated mesh.
+#[derive(Copy, Clone)]
+pub struct Vertex {
+    position: [f32; 3],
+    normal: [f32; 3],
+    distance_from_surface: f32,
+}
+
+implement_vertex!(Vertex, position, normal, distance_from_surface);
 
 
 

@@ -79,6 +79,7 @@ impl Shape for Mandelbulb {
 /// This operation rotates the point as triplex number. This is equivalent to
 /// the squaring in the original 2D mandelbrot. First we convert the point
 /// to spherical coordinates, then we rotate and convert them back.
+#[inline(always)]
 fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
     // Handle special case (general formula is not able to handle points on
     // the z axis).
@@ -96,15 +97,11 @@ fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
 
 
     // For some integer powers there are formulas without trigonometric
-    // functions. This improves performance.
+    // functions. This improves performance a lot (see #17).
     match power {
         8 => {
             let Point3 { x, y, z } = p;
 
-            // Yes we actually need to do that, LLVM won't generate optimal
-            // code here. LLVM transforms `x.powf(2)` into `x * x` but that's
-            // all. It has probably to do with floating point precision, but
-            // it's not that important for us.
             let x2 = x.powi(2);
             let x4 = x.powi(4);
             let x6 = x.powi(6);
