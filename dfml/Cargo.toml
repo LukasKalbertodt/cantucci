@@ -1,0 +1,16 @@
+[package]
+name = "dfml"
+version = "0.1.0"
+authors = ["Lukas Kalbertodt <lukas.kalbertodt@gmail.com>"]
+build = "build.rs"
+
+[[bin]]
+name = "dfmlc"
+path = "dfmlc/main.rs"
+
+
+[dependencies]
+lalrpop-util = "0.12.5"
+
+[build-dependencies]
+lalrpop = "0.12.5"
