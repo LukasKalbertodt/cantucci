@@ -1,7 +1,7 @@
 use std::ops::Range;
 use cgmath;
 
-use core::math::*;
+use math::*;
 
 /// This camera implementation always uses (0, 0, 1) as up-vector. Because the
 /// direction vector must never be linear dependent to the up-vector, we have

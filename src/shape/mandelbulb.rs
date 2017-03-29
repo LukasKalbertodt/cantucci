@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use math::*;
 use super::Shape;
 
@@ -6,7 +8,7 @@ use super::Shape;
 /// [1]: http://www.skytopia.com/project/fractal/mandelbulb.html
 #[derive(Clone)]
 pub struct Mandelbulb {
-    power: f32,
+    power: u8,
     max_iters: u64,
     bailout: f32,
 }
@@ -14,7 +16,7 @@ pub struct Mandelbulb {
 const CENTER: Point3<f32> = Point3 { x: 0.0, y: 0.0, z: 0.0 };
 
 impl Mandelbulb {
-    pub fn new(power: f32, max_iters: u64, bailout: f32) -> Self {
+    pub fn new(power: u8, max_iters: u64, bailout: f32) -> Self {
         Mandelbulb {
             power: power,
             max_iters: max_iters,
@@ -23,7 +25,7 @@ impl Mandelbulb {
     }
 
     pub fn classic(max_iters: u64, bailout: f32) -> Self {
-        Self::new(8.0, max_iters, bailout)
+        Self::new(8, max_iters, bailout)
     }
 }
 
@@ -45,6 +47,12 @@ impl Shape for Mandelbulb {
         true
     }
 
+    fn bounding_box(&self) -> Range<Point3<f32>> {
+        // TODO: This value was found by experimenting... we should prove this
+        // value
+        Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
+    }
+
     fn min_distance_from(&self, p: Point3<f32>) -> f32 {
         let mut z = p;
         let mut dr = 1.0;
@@ -56,7 +64,7 @@ impl Shape for Mandelbulb {
                 break;
             }
 
-            dr = r.powf(self.power - 1.0) * self.power * dr + 1.0;
+            dr = r.powi(self.power as i32 - 1) * (self.power as f32) * dr + 1.0;
             z = rotate(z, self.power) + (p - CENTER);
         }
 
@@ -79,40 +87,77 @@ impl Shape for Mandelbulb {
 /// This operation rotates the point as triplex number. This is equivalent to
 /// the squaring in the original 2D mandelbrot. First we convert the point
 /// to spherical coordinates, then we rotate and convert them back.
-fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {
-    // For some integer powers there are formulas without trigonometric
-    // functions. This improves performance... maybe.
-    match power {
-        // 8.0 => {
-        //     let Point3 { x, y, z } = p;
-        //     let rxy2 = x.powf(2.0) + y.powf(2.0);
-        //     let a = 1.0 + (
-        //         z.powf(8.0)
-        //         - 28.0 * z.powf(6.0) * rxy2.powf(1.0)
-        //         + 70.0 * z.powf(4.0) * rxy2.powf(2.0)
-        //         - 28.0 * z.powf(2.0) * rxy2.powf(3.0)
-        //     ) / rxy2.powf(4.0);
+#[inline(always)]
+fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
+    // Handle special case (general formula is not able to handle points on
+    // the z axis).
+    if p.x == 0.0 && p.y == 0.0 {
+        let old_radius = (p - CENTER).magnitude();
+        let theta = (p.z / old_radius).acos();
 
-        //     Point3 {
-        //         x: a * (
-        //             x.powf(8.0)
-        //             - 28.0 * x.powf(6.0) * y.powf(2.0)
-        //             + 70.0 * x.powf(4.0) * y.powf(4.0)
-        //             - 28.0 * x.powf(2.0) * y.powf(6.0)
-        //             - y.powf(8.0)
-        //         ),
-        //         y: 8.0 * a * x * y * (
-        //             x.powf(6.0)
-        //             - 7.0 * x.powf(4.0) * y.powf(2.0)
-        //             + 7.0 * x.powf(2.0) * y.powf(4.0)
-        //             - y.powf(6.0)
-        //         ),
-        //         z: 8.0 * z
-        //             * rxy2.sqrt()
-        //             * (z.powf(2.0) - rxy2)
-        //             * (z.powf(4.0) - 6.0 * z.powf(2.0) * rxy2 + rxy2.powf(2.0)),
-        //     }
-        // }
+        // Scale and rotate the point
+        let new_radius = old_radius.powi(power.into());
+        let theta = theta * power as f32;
+
+        // Convert back to cartesian coordinates
+        return new_radius * Point3::new(0.0, 0.0, theta.cos());
+    }
+
+
+    // For some integer powers there are formulas without trigonometric
+    // functions. This improves performance a lot (see #17).
+    match power {
+        8 => {
+            let Point3 { x, y, z } = p;
+
+            let x2 = x.powi(2);
+            let x4 = x.powi(4);
+            let x6 = x.powi(6);
+            let x8 = x.powi(8);
+
+            let y2 = y.powi(2);
+            let y4 = y.powi(4);
+            let y6 = y.powi(6);
+            let y8 = y.powi(8);
+
+            let z2 = z.powi(2);
+            let z4 = z.powi(4);
+            let z6 = z.powi(6);
+            let z8 = z.powi(8);
+
+            let rxy2 = x2 + y2;
+            let rxy4 = rxy2.powi(2);
+            let rxy6 = rxy2.powi(3);
+            let rxy8 = rxy2.powi(4);
+
+            let a = 1.0 + (
+                z8
+                - 28.0 * z6 * rxy2
+                + 70.0 * z4 * rxy4
+                - 28.0 * z2 * rxy6
+            ) / rxy8;
+
+
+            Point3 {
+                x: a * (
+                    x8
+                    - 28.0 * x6 * y2
+                    + 70.0 * x4 * y4
+                    - 28.0 * x2 * y6
+                    - y8
+                ),
+                y: 8.0 * a * x * y * (
+                    x6
+                    - 7.0 * x4 * y2
+                    + 7.0 * x2 * y4
+                    - y6
+                ),
+                z: 8.0 * z
+                    * rxy2.sqrt()
+                    * (z2 - rxy2)
+                    * (z4 - 6.0 * z2 * rxy2 + rxy4),
+            }
+        }
         _ => {
             let old_radius = (p - CENTER).magnitude();
 
@@ -121,9 +166,9 @@ fn rotate(p: Point3<f32>, power: f32) -> Point3<f32> {
             let phi = f32::atan2(p.y, p.x);
 
             // Scale and rotate the point
-            let new_radius = old_radius.powf(power);
-            let theta = theta * power;
-            let phi = phi * power;
+            let new_radius = old_radius.powi(power.into());
+            let theta = theta * power as f32;
+            let phi = phi * power as f32;
 
             // Convert back to cartesian coordinates
             new_radius * Point3::new(

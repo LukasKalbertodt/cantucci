@@ -12,7 +12,7 @@ use glium::{
 };
 
 use camera::Camera;
-use core::math::*;
+use math::*;
 use errors::*;
 use super::SKY_DISTANCE;
 use util::{self, ToArr};

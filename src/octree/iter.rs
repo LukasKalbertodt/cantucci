@@ -4,12 +4,12 @@ use super::{NodeEntry, NodeEntryMut, Octree, Span};
 
 
 /// An iterator over *im*mutable references of nodes
-pub struct Iter<'a, T: 'a> {
-    to_visit: Vec<NodeEntry<'a, T>>,
+pub struct Iter<'a, L: 'a, I: 'a> {
+    to_visit: Vec<NodeEntry<'a, L, I>>,
 }
 
-impl<'a, T> Iter<'a, T> {
-    pub fn new(tree: &'a Octree<T>) -> Self {
+impl<'a, L, I> Iter<'a, L, I> {
+    pub fn new(tree: &'a Octree<L, I>) -> Self {
         Iter {
             to_visit: vec![
                 NodeEntry {
@@ -21,8 +21,8 @@ impl<'a, T> Iter<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Iterator for Iter<'a, T> {
-    type Item = NodeEntry<'a, T>;
+impl<'a, L: 'a, I: 'a> Iterator for Iter<'a, L, I> {
+    type Item = NodeEntry<'a, L, I>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.to_visit.pop().map(|next| {
@@ -40,16 +40,19 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
 /// The mutable iterator can't produce `NodeEntryMut`, because multiple mutable
 /// references could be obtained which could lead to iterator invalidation or
 /// worse (which is of course prevented by the borrow checker).
-pub enum IterElemMut<'a, T: 'a> {
+pub enum IterElemMut<'a, L: 'a, I: 'a> {
     Leaf {
         span: Span,
-        data: &'a mut Option<T>,
+        data: &'a mut Option<L>,
     },
-    Inner(Span),
+    Inner {
+        span: Span,
+        data: &'a mut Option<I>,
+    },
 }
 
-impl<'a, T> IterElemMut<'a, T> {
-    pub fn into_leaf(self) -> Option<(Span, &'a mut Option<T>)> {
+impl<'a, L, I> IterElemMut<'a, L, I> {
+    pub fn into_leaf(self) -> Option<(Span, &'a mut Option<L>)> {
         match self {
             IterElemMut::Leaf { span, data } => Some((span, data)),
             _ => None,
@@ -59,19 +62,19 @@ impl<'a, T> IterElemMut<'a, T> {
     pub fn span(&self) -> Span {
         match *self {
             IterElemMut::Leaf { ref span, .. } => span,
-            IterElemMut::Inner(ref span) => span,
+            IterElemMut::Inner { ref span, .. } => span,
         }.clone()
     }
 }
 
 
 /// An iterator over mutable references of nodes
-pub struct IterMut<'a, T: 'a> {
-    to_visit: Vec<NodeEntryMut<'a, T>>,
+pub struct IterMut<'a, L: 'a, I: 'a> {
+    to_visit: Vec<NodeEntryMut<'a, L, I>>,
 }
 
-impl<'a, T> IterMut<'a, T> {
-    pub fn new(tree: &'a mut Octree<T>) -> Self {
+impl<'a, L, I> IterMut<'a, L, I> {
+    pub fn new(tree: &'a mut Octree<L, I>) -> Self {
         IterMut {
             to_visit: vec![
                 NodeEntryMut {
@@ -83,8 +86,8 @@ impl<'a, T> IterMut<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Iterator for IterMut<'a, T> {
-    type Item = IterElemMut<'a, T>;
+impl<'a, L: 'a, I: 'a> Iterator for IterMut<'a, L, I> {
+    type Item = IterElemMut<'a, L, I>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.to_visit.pop().map(|next| {
@@ -95,9 +98,9 @@ impl<'a, T: 'a> Iterator for IterMut<'a, T> {
                 }
             } else {
                 let span = next.span();
-                let children = next.into_children().unwrap();
+                let (data, children) = next.into_inner_parts().unwrap();
                 self.to_visit.extend(ArrayVec::from(children));
-                IterElemMut::Inner(span)
+                IterElemMut::Inner { span: span, data: data }
             }
         })
     }
