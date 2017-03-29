@@ -88,43 +88,41 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
 
     /// Updates the mesh representing the shape.
     pub fn update<F: Facade>(&mut self, facade: &F, camarero: &Camera) -> Result<()> {
-        // increase resolution dynamically if there is a cube responding to the focus
-        // TODO: get_focus should return a list of maximum n focus points or None if 
-        //       no focus existing.
-        use std::collections::HashSet;
-
-        let test = self.get_focii(camarero);
-        // let set: HashSet<_> = test.into_iter().collect();
-        // for (i,p) in test.iter().enumerate() {
-
-        //     println!("{} -> {:?}", i, Point3::from_homogeneous((camarero.projection.transformation_matrix() * camarero.view_transform()) * p.to_homogeneous()));
-
-        // } 
-        for focus in test { 
-            // TODO: here we iterate over this list and work out the leafs that all 
-            //       the points lie inside. These should be stored in a Set, as we 
-            //       do not want to split cubes more than once
-            // this check is necessary because sometimes the focus method returns focus points
-            // that do not lead to a leaf node for the octree for some reason...
+        // increase resolution dynamically if there is a cube responding to the focii
+        let focii = self.get_focii(camarero);
+        for (i, &focus) in focii.iter().enumerate() {
             if let Some(mut leaf) = self.tree.leaf_around_mut(focus) {
-                let dist = camarero.position.distance(focus);
-                let span = leaf.span();
-                let threshold = 2.0 * (span.end.x - span.start.x).abs();
-
-                // if we are near enough to the surface, increase resolution
-                if dist < threshold {
-                    leaf.split();
+                let do_split = if let &Some(MeshStatus::Ready(ref view)) = leaf.leaf_data().unwrap() {
+                    true
+                } else {
+                    false
+                };
+                if do_split {
+                    let dist = camarero.position.distance(focus);
+                    let span = leaf.span();
+                    let threshold = 2.0 * (span.end.x - span.start.x).abs();
+                    // if we are near enough to the surface, increase resolution
+                    if dist < threshold {
+                        leaf.split();
+                    }
                 }
             }
         }
+        // Debug reasons
+        // let set: HashSet<_> = focii.into_iter().collect();
+        // for (i,p) in focii.iter().enumerate() {
 
-        // old version: split on click
+        //     println!("{} -> {:?}", i, Point3::from_homogeneous((camarero.projection.transformation_matrix() * camarero.view_transform()) * p.to_homogeneous()));
+
+        // }
+
+        // Old version: split on click
         // if self.split_next_time {
         //     let focus = self.get_focus(camarero);
         //     self.tree.leaf_around_mut(focus).split();
         //     self.split_next_time = false;
         // }
-        
+
         let jobs_before = self.active_jobs;
 
         // Collect generated meshes and prepare them for rendering.
@@ -222,13 +220,10 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             }
         }
 
-
         Ok(())
     }
 
-    // TODO: create a List of Points with focii
     pub fn get_focii(&self, camera: &Camera) -> Vec<Point3<f32>> {
-        
         let mut vec = Vec::new();
         for i in 0u8..9 {
             if let Some(ret) = Self::get_focus_in_part(self, camera, i) {
@@ -239,7 +234,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     }
 
     // Wrapper method for just getting the focus along the regular camera direction vector
-    pub fn get_focus(&self, camera: &Camera) -> Option<Point3<f32>> { 
+    pub fn get_focus(&self, camera: &Camera) -> Option<Point3<f32>> {
         Self::get_focus_in_part(self, camera, 4)
     }
 
