@@ -77,16 +77,29 @@ impl<L, I> Octree<L, I> {
         if !node.span().contains(p) {
             return None;
         }
+        let mut depth = 0;
         loop {
             if node.is_leaf() {
                 return Some(node);
             } else {
-                node = node
+                let parent_span = node.span();
+                let mut children_spans = Vec::new();
+                node = match node
                     .into_children()
                     .unwrap()
                     .into_iter()
-                    .find(|c| c.span().contains(p))
-                    .unwrap();
+                    .inspect(|c| children_spans.push(c.span()))
+                    .find(|c| c.span().contains(p)) {
+                    Some(c) => c,
+                    None => {
+                        println!("{:?}", p);
+                        println!("parent span: {:?}", parent_span);
+                        print!("depth: {}", depth);
+                        println!("cspans: {:#?}", children_spans);
+                        panic!();
+                    }
+                };
+                depth += 1;
             }
         }
     }
@@ -187,18 +200,27 @@ impl<'a, L, I> NodeEntry<'a, L, I> {
         match *self.node {
             Octnode::SubTree { ref children, ..} => {
                 let start = self.span.start;
-                let half_diff = (self.span.end - start) / 2.0;
+                let end = self.span.end;
+                let center = start + (self.span.end - start) / 2.0;
+
+                let spans = [
+                    start .. center,
+                    Point3 { z: center.z, .. start } .. Point3 { z: end.z, .. center },
+                    Point3 { y: center.y, .. start } .. Point3 { y: end.y, .. center },
+                    Point3 { x: start.x, .. center } .. Point3 { x: center.x, .. end },
+                    Point3 { x: center.x, .. start } .. Point3 { x: end.x, .. center },
+                    Point3 { y: start.y, .. center } .. Point3 { y: center.y, .. end },
+                    Point3 { z: start.z, .. center } .. Point3 { z: center.z, .. end },
+                    center .. end,
+                ];
 
                 Some(children
                     .iter()
-                    .zip(SPLIT_SPAN_DIFF_AMOUNT)
-                    .map(|(child, &diff_amount)| {
-                        let child_start = start + half_diff.mul_element_wise(diff_amount);
-                        let child_end = child_start + half_diff;
-
+                    .zip(&spans)
+                    .map(|(child, span)| {
                         NodeEntry {
                             node: child,
-                            span: child_start .. child_end,
+                            span: span.clone(),
                         }
                     })
                     .collect()
@@ -304,18 +326,27 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
         match *self.node {
             Octnode::SubTree { ref mut children, .. } => {
                 let start = self.span.start;
-                let half_diff = (self.span.end - start) / 2.0;
+                let end = self.span.end;
+                let center = start + (self.span.end - start) / 2.0;
+
+                let spans = [
+                    start .. center,
+                    Point3 { z: center.z, .. start } .. Point3 { z: end.z, .. center },
+                    Point3 { y: center.y, .. start } .. Point3 { y: end.y, .. center },
+                    Point3 { x: start.x, .. center } .. Point3 { x: center.x, .. end },
+                    Point3 { x: center.x, .. start } .. Point3 { x: end.x, .. center },
+                    Point3 { y: start.y, .. center } .. Point3 { y: center.y, .. end },
+                    Point3 { z: start.z, .. center } .. Point3 { z: center.z, .. end },
+                    center .. end,
+                ];
 
                 Some(children
                     .iter_mut()
-                    .zip(SPLIT_SPAN_DIFF_AMOUNT)
-                    .map(|(child, &diff_amount)| {
-                        let child_start = start + half_diff.mul_element_wise(diff_amount);
-                        let child_end = child_start + half_diff;
-
+                    .zip(&spans)
+                    .map(|(child, span)| {
                         NodeEntryMut {
                             node: child,
-                            span: child_start .. child_end,
+                            span: span.clone(),
                         }
                     })
                     .collect()

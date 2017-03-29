@@ -68,7 +68,7 @@ impl Shape for Mandelbulb {
             z = rotate(z, self.power) + (p - CENTER);
         }
 
-        let ln_r = if r.ln().is_infinite() { 0.0 } else { r.ln() * r };
+        let ln_r = if r == 0.0 { 0.0 } else { r.ln() * r };
         0.5 * ln_r / dr
     }
 
