@@ -92,7 +92,9 @@ impl ShapeMesh {
     /// Updates the mesh representing the shape.
     pub fn update<F: Facade>(&mut self, facade: &F, camera: &Camera) -> Result<()> {
         // increase resolution dynamically if there is a cube responding to the focii
-        let focii = self.get_focii(camera);
+        // determines how many focus points are used to determine which nodes are to be split
+        const FOCUS_POINTS: u8 = 5;
+        let focii = self.get_focii(camera, FOCUS_POINTS);
         for focus in focii {
             if let Some(mut leaf) = self.tree.leaf_around_mut(focus) {
                 let do_split = if let &Some(MeshStatus::Ready(_)) = leaf.leaf_data().unwrap() {
@@ -227,43 +229,60 @@ impl ShapeMesh {
         Ok(())
     }
 
-    pub fn get_focii(&self, camera: &Camera) -> Vec<Point3<f32>> {
+    /// Returns equally distributed points on the near_plane. The number of points
+    /// returned is focus_points².
+    pub fn get_focii(&self, camera: &Camera, focus_points: u8) -> Vec<Point3<f32>> {
+        // sets the amount of focus points that may cause a split event
+        const EPSILON: f32 = 0.000_001;
+        const MAX_ITERS: u64 = 100;
+
+        let bb = camera.get_near_plane_bb();
+        let frustum_width = bb.1.x - bb.0.x;
+        let frustum_height = bb.1.y - bb.0.y;
+        let size_horizontal = frustum_width/focus_points as f32;
+        let size_vertical = frustum_height/focus_points as f32;
+        let center_diff = (bb.1 - bb.0)/(2.0*focus_points as f32);
+
+        let inv_view_trans = camera.view_transform().invert().unwrap();
+
         let mut vec = Vec::new();
-        for i in 0u8..9 {
-            if let Some(ret) = Self::get_focus_in_part(self, camera, i) {
-                vec.push(ret);
+        for y in 0..focus_points {
+            for x in 0..focus_points {
+                let center = bb.0 + Vector3::new(
+                    x as f32 * size_horizontal,
+                    y as f32 * size_vertical,
+                    0.0,
+                ) + center_diff;
+                
+                vec.push(
+                    Point3::from_homogeneous(
+                        inv_view_trans * center.to_homogeneous()
+                    )
+                );
             }
         }
-        vec
+
+        let mut ret = Vec::new();
+        for point in vec {
+            let mut pos = camera.position;
+            let dir = (point - camera.position).normalize();
+
+            for _ in 0..MAX_ITERS {
+                let distance = self.shape.min_distance_from(pos);
+                pos += dir * distance;
+                if distance < EPSILON {
+                    ret.push(pos);
+                    break;
+                }
+            }
+        }
+        ret
     }
 
     // Wrapper method for just getting the focus along the regular camera direction vector
     pub fn get_focus(&self, camera: &Camera) -> Option<Point3<f32>> {
-        Self::get_focus_in_part(self, camera, 4)
-    }
-
-    /// Returns the point on the shape's surface the camera is currently looking at
-    pub fn get_focus_in_part(&self, camera: &Camera, part: u8) -> Option<Point3<f32>> {
-        const EPSILON: f32 = 0.000_001;
-        const MAX_ITERS: u64 = 100;
-
-        let mut pos = camera.position;
-        // TODO: maybe make parts more variable
-        //     /*
-        //         part:
-        //         0 1 2
-        //         3 4 5
-        //         6 7 8
-        //     */
-        let bb   = camera.get_near_plane_bb();
-        let dir = (bb[part as usize] - camera.position).normalize();
-
-        for _ in 0..MAX_ITERS {
-            let distance = self.shape.min_distance_from(pos);
-            pos += dir * distance;
-            if distance < EPSILON {
-                return Some(pos);
-            }
+        for point in Self::get_focii(self, camera, 1) {
+            return Some(point);
         }
         None
     }
