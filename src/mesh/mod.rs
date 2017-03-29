@@ -42,7 +42,6 @@ pub struct ShapeMesh<Sh> {
     new_meshes: Receiver<(Point3<f32>, MeshBuffer)>,
     mesh_tx: Sender<(Point3<f32>, MeshBuffer)>,
     active_jobs: u64,
-    split_next_time: bool,
     show_debug: bool,
 }
 
@@ -77,7 +76,6 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             new_meshes: rx,
             mesh_tx: tx,
             active_jobs: 0,
-            split_next_time: false,
             show_debug: true,
         })
     }
@@ -87,18 +85,18 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     }
 
     /// Updates the mesh representing the shape.
-    pub fn update<F: Facade>(&mut self, facade: &F, camarero: &Camera) -> Result<()> {
+    pub fn update<F: Facade>(&mut self, facade: &F, camera: &Camera) -> Result<()> {
         // increase resolution dynamically if there is a cube responding to the focii
-        let focii = self.get_focii(camarero);
-        for (i, &focus) in focii.iter().enumerate() {
+        let focii = self.get_focii(camera);
+        for focus in focii {
             if let Some(mut leaf) = self.tree.leaf_around_mut(focus) {
-                let do_split = if let &Some(MeshStatus::Ready(ref view)) = leaf.leaf_data().unwrap() {
+                let do_split = if let &Some(MeshStatus::Ready(_)) = leaf.leaf_data().unwrap() {
                     true
                 } else {
                     false
                 };
                 if do_split {
-                    let dist = camarero.position.distance(focus);
+                    let dist = camera.position.distance(focus);
                     let span = leaf.span();
                     let threshold = 2.0 * (span.end.x - span.start.x).abs();
                     // if we are near enough to the surface, increase resolution
@@ -108,20 +106,6 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
                 }
             }
         }
-        // Debug reasons
-        // let set: HashSet<_> = focii.into_iter().collect();
-        // for (i,p) in focii.iter().enumerate() {
-
-        //     println!("{} -> {:?}", i, Point3::from_homogeneous((camarero.projection.transformation_matrix() * camarero.view_transform()) * p.to_homogeneous()));
-
-        // }
-
-        // Old version: split on click
-        // if self.split_next_time {
-        //     let focus = self.get_focus(camarero);
-        //     self.tree.leaf_around_mut(focus).split();
-        //     self.split_next_time = false;
-        // }
 
         let jobs_before = self.active_jobs;
 
@@ -244,8 +228,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
         const MAX_ITERS: u64 = 100;
 
         let mut pos = camera.position;
-        // let dir = camera.direction();
-        // TODO: make the number of parts variable...
+        // TODO: maybe make parts more variable
         //     /*
         //         part:
         //         0 1 2
@@ -270,10 +253,6 @@ impl<Sh: Shape> EventHandler for ShapeMesh<Sh> {
 
     fn handle_event(&mut self, e: &Event) -> EventResponse {
         match *e {
-            // Event::MouseInput(ElementState::Released, MouseButton::Left) => {
-            //     self.split_next_time = true;
-            //     EventResponse::Continue
-            // },
             Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::G)) => {
                 self.show_debug = !self.show_debug;
                 EventResponse::Continue
