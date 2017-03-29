@@ -3,11 +3,12 @@ use glium::Surface;
 use glium::glutin::{Event, MouseButton, ElementState, VirtualKeyCode};
 use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 use threadpool::ThreadPool;
 
 use camera::Camera;
-use core::math::*;
-use core::Shape;
+use math::*;
+use shape::Shape;
 use env::Environment;
 use errors::*;
 use octree::{DebugView, Octree, SpanExt};
@@ -17,21 +18,21 @@ mod buffer;
 mod renderer;
 mod view;
 
-use self::buffer::MeshBuffer;
+use self::buffer::{MeshBuffer, Timings};
 use self::view::MeshView;
 use self::renderer::Renderer;
 
 /// Type to manage the graphical representation of the shape. It updates the
 /// internal data depending on the camera position and resolution.
-pub struct ShapeMesh<Sh> {
+pub struct ShapeMesh {
     /// This octree holds the whole mesh.
-    tree: Octree<MeshStatus>,
+    tree: Octree<MeshStatus, ()>,
 
     /// Holds global data (like the OpenGL program) to render the mesh.
     renderer: Renderer,
 
     /// The shape this mesh represents.
-    shape: Sh,
+    shape: Arc<Shape>,
 
     /// Show the borders of the octree
     debug_octree: DebugView,
@@ -39,23 +40,25 @@ pub struct ShapeMesh<Sh> {
     // The following fields are simply to manage the generation of the mesh on
     // multiple threads.
     thread_pool: ThreadPool,
-    new_meshes: Receiver<(Point3<f32>, MeshBuffer)>,
-    mesh_tx: Sender<(Point3<f32>, MeshBuffer)>,
+    new_meshes: Receiver<(Point3<f32>, (MeshBuffer, Timings))>,
+    mesh_tx: Sender<(Point3<f32>, (MeshBuffer, Timings))>,
     active_jobs: u64,
     split_next_time: bool,
     show_debug: bool,
+
+    // These are just for debugging/time measuring purposes
+    batch_timings: Timings,
+    finished_jobs: u64,
 }
 
-impl<Sh: Shape + Clone> ShapeMesh<Sh> {
-    pub fn new<F: Facade>(facade: &F, shape: Sh) -> Result<Self> {
+impl ShapeMesh {
+    pub fn new<F: Facade>(facade: &F, shape: Arc<Shape>) -> Result<Self> {
         // Setup an empty tree and split the first two levels which results in
         // 8² = 64 children
-        let mut tree = Octree::spanning(
-            Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)
-        );
-        let _ = tree.root_mut().split();
+        let mut tree = Octree::spanning(shape.bounding_box());
+        let _ = tree.root_mut().split(None);
         for mut child in tree.root_mut().into_children().unwrap() {
-            child.split();
+            child.split(None);
         }
 
         // Prepare channels and thread pool to generate the mesh on all CPU
@@ -65,7 +68,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
         let pool = ThreadPool::new(num_threads);
         info!("Using {} threads to generate mesh", num_threads);
 
-        let renderer = Renderer::new(facade, &shape)?;
+        let renderer = Renderer::new(facade, &*shape)?;
         let debug_octree = DebugView::new(facade)?;
 
         Ok(ShapeMesh {
@@ -79,11 +82,13 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             active_jobs: 0,
             split_next_time: false,
             show_debug: true,
+            batch_timings: Timings::default(),
+            finished_jobs: 0,
         })
     }
 
-    pub fn shape(&self) -> &Sh {
-        &self.shape
+    pub fn shape(&self) -> &Shape {
+        &*self.shape
     }
 
     /// Updates the mesh representing the shape.
@@ -93,14 +98,17 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             let node = self.get_focus(camarero)
                 .and_then(|focus| self.tree.leaf_around_mut(focus));
             if let Some(mut node) = node {
-                node.split();
+                node.split(None);
             }
         }
         let jobs_before = self.active_jobs;
+        let finished_jobs_before = self.finished_jobs;
 
         // Collect generated meshes and prepare them for rendering.
-        for (center, buf) in self.new_meshes.try_iter() {
+        for (center, (buf, timings)) in self.new_meshes.try_iter() {
             self.active_jobs -= 1;
+            self.finished_jobs += 1;
+            self.batch_timings = self.batch_timings + timings;
 
             // Create OpenGL view from raw buffer and save it in the
             // tree.
@@ -127,7 +135,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
             .filter_map(|n| n.into_leaf())
             .filter(|&(_, ref leaf_data)| leaf_data.is_none());
         for (span, leaf_data) in empty_leaves {
-            const RESOLUTION: u32 = 60;
+            const RESOLUTION: u32 = 64;
 
             // Prepare values to be moved into the closure
             let tx = self.mesh_tx.clone();
@@ -135,7 +143,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
 
             // Generate the raw buffers on another thread
             self.thread_pool.execute(move || {
-                let buf = MeshBuffer::generate_for_box(&span, &shape, RESOLUTION);
+                let buf = MeshBuffer::generate_for_box(&span, &*shape, RESOLUTION);
                 tx.send((span.center(), buf))
                     .expect("main thread has hung up, my work was for nothing! :-(");
             });
@@ -157,6 +165,18 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
 
         if jobs_before != self.active_jobs {
             trace!("Currently active sample jobs: {}", self.active_jobs);
+        }
+
+        const PRINT_EVERY_FINISHED_JOBS: u64 = 64;
+        if self.finished_jobs % PRINT_EVERY_FINISHED_JOBS == 0
+            && self.finished_jobs > 0
+            && finished_jobs_before != self.finished_jobs {
+            debug!(
+                "Finished {} new jobs in: {}",
+                PRINT_EVERY_FINISHED_JOBS,
+                self.batch_timings,
+            );
+            self.batch_timings = Timings::default();
         }
 
         Ok(())
@@ -214,7 +234,7 @@ impl<Sh: Shape + Clone> ShapeMesh<Sh> {
     }
 }
 
-impl<Sh: Shape> EventHandler for ShapeMesh<Sh> {
+impl EventHandler for ShapeMesh {
 
     fn handle_event(&mut self, e: &Event) -> EventResponse {
         match *e {

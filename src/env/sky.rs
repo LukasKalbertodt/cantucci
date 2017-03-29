@@ -3,7 +3,7 @@ use glium::index::PrimitiveType;
 use glium::{DrawParameters, IndexBuffer, Program, Surface, VertexBuffer};
 
 use camera::Camera;
-use core::math::*;
+use math::*;
 use errors::*;
 use super::SKY_DISTANCE;
 use util::{self, ToArr};

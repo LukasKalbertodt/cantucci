@@ -1,13 +1,12 @@
 use glium::backend::glutin_backend::GlutinFacade;
+use std::sync::Arc;
 
 use camera::Projection;
 use control::Fly as FlyControl;
 use control::Orbit as OrbitControl;
 use control::{CamControl, KeySwitcher};
-use core::math::*;
-// TODO: remove attribute once Shape can be used as trait object (see #18)
-#[allow(unused_imports)]
-use core::shape::{Mandelbulb, Sphere};
+use math::*;
+use shape::{Shape, Mandelbulb, Sphere};
 use env::Environment;
 use errors::*;
 use event::{EventResponse, poll_events_with, QuitHandler};
@@ -18,8 +17,7 @@ const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 pub struct App {
     facade: GlutinFacade,
     control: Box<CamControl>,
-    mesh: ShapeMesh<Mandelbulb>,
-    // mesh: ShapeMesh<Sphere>,
+    mesh: ShapeMesh,
     env: Environment,
     print_fps: bool,
 }
@@ -33,13 +31,16 @@ impl App {
         let facade = create_context()
             .chain_err(|| "failed to create GL context")?;
 
-        let shape = Mandelbulb::classic(6, 2.5);
-        // let shape = Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0);
+        let shape = if ::std::env::args().len() > 1 {
+            Arc::new(Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0)) as Arc<Shape>
+        } else {
+            Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<Shape>
+        };
         let mesh = ShapeMesh::new(&facade, shape)?;
 
         let proj = Projection::new(
             Rad(1.0),
-            0.000_2 .. 10.0,
+            0.000_04 .. 10.0,
             facade.get_framebuffer_dimensions(),
         );
 

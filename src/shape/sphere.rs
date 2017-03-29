@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use math::*;
 use super::Shape;
 
@@ -20,6 +22,11 @@ impl Shape for Sphere {
     // Overwrite default method for performance
     fn contains(&self, p: Point3<f32>) -> bool {
         (self.center - p).magnitude2() <= (self.radius * self.radius)
+    }
+
+    fn bounding_box(&self) -> Range<Point3<f32>> {
+        let off = Vector3::new(self.radius, self.radius, self.radius);
+        self.center + -off .. self.center + off
     }
 
     fn min_distance_from(&self, p: Point3<f32>) -> f32 {

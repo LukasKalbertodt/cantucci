@@ -1,4 +1,4 @@
-use core::math::*;
+use math::*;
 
 pub mod gl;
 pub mod iter;

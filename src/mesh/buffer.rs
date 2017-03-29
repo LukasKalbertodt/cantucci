@@ -1,7 +1,9 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use std::fmt;
+use std::ops;
 
-use core::math::*;
-use core::Shape;
+use math::*;
+use shape::Shape;
 use octree::Span;
 use util::ToArr;
 use util::iter::cube;
@@ -9,32 +11,22 @@ use util::grid::GridTable;
 use util::time::DurationExt;
 
 
-#[derive(Copy, Clone)]
-pub struct Vertex {
-    position: [f32; 3],
-    normal: [f32; 3],
-    distance_from_surface: f32,
-}
-
-implement_vertex!(Vertex, position, normal, distance_from_surface);
-
-
 pub struct MeshBuffer {
     raw_vbuf: Vec<Vertex>,
     raw_ibuf: Vec<u32>,
-    // resolution: u32, // TODO: use or delete
 }
 
 impl MeshBuffer {
-    pub fn generate_for_box<S: Shape>(
+    pub fn generate_for_box(
         span: &Span,
-        shape: &S,
+        shape: &Shape,
         resolution: u32,
-    ) -> Self {
+    ) -> (Self, Timings) {
         assert!(span.start.x < span.end.x);
         assert!(span.start.y < span.end.y);
         assert!(span.start.z < span.end.z);
         assert!(resolution != 0);
+        assert!(resolution.is_power_of_two());
 
         Self::naive_surface_nets(span, shape, resolution)
     }
@@ -53,11 +45,11 @@ impl MeshBuffer {
     /// as it preserves sharp features of the shape (see #2).
     ///
     /// [1]: https://0fps.net/2012/07/12/smooth-voxel-terrain-part-2/
-    fn naive_surface_nets<S: Shape>(
+    fn naive_surface_nets(
         span: &Span,
-        shape: &S,
+        shape: &Shape,
         resolution: u32,
-    ) -> Self {
+    ) -> (Self, Timings) {
         // Adjust span to avoid holes in between two boxes
         let span = {
             let overflow = (span.end - span.start) / resolution as f32;
@@ -245,7 +237,7 @@ impl MeshBuffer {
             let dist_p = shape.min_distance_from(p);
 
             let normal = {
-                let delta = 0.01 * (span.end - span.start) / resolution as f32;
+                let delta = 0.7 * (span.end - span.start) / resolution as f32;
                 Vector3::new(
                     shape.min_distance_from(p + Vector3::unit_x() * delta.x)
                         - shape.min_distance_from(p +  Vector3::unit_x() * -delta.x),
@@ -327,23 +319,28 @@ impl MeshBuffer {
         }
 
         let after_third = Instant::now();
-
+        let timings = Timings {
+            first: before_second - before_first,
+            second: before_third - before_second,
+            third: after_third -  before_third,
+            vertices: raw_vbuf.len() as u32,
+            faces: raw_ibuf.len() as u32 / 6,
+        };
 
         trace!(
-            "Generated {:5} points, {:5} triangles in {:9} ({:9}, {:9}, {:9})",
+            "Generated {:6} points, {:6} faces in {}",
             raw_vbuf.len(),
-            raw_ibuf.len() / 3,
-            (after_third - before_first).display_ms(),
-            (before_second - before_first).display_ms(),
-            (before_third - before_second).display_ms(),
-            (after_third - before_third).display_ms(),
+            raw_ibuf.len() / 6,
+            timings,
         );
 
-        MeshBuffer {
-            raw_vbuf: raw_vbuf,
-            raw_ibuf: raw_ibuf,
-            // resolution: resolution,  // TODO: use or delete
-        }
+        (
+            MeshBuffer {
+                raw_vbuf: raw_vbuf,
+                raw_ibuf: raw_ibuf,
+            },
+            timings
+        )
     }
 
     pub fn raw_vbuf(&self) -> &[Vertex] {
@@ -353,66 +350,56 @@ impl MeshBuffer {
     pub fn raw_ibuf(&self) -> &[u32] {
         &self.raw_ibuf
     }
-
-    // TODO: use or delete
-    // pub fn resolution(&self) -> u32 {
-    //     self.resolution
-    // }
 }
 
 
+/// Stores some information about how long various passes of the mesh
+/// generation algorithm were running as well as how many vertices and faces
+/// were created.
+#[derive(Default, Clone, Copy)]
+pub struct Timings {
+    first: Duration,
+    second: Duration,
+    third: Duration,
+    vertices: u32,
+    faces: u32,
+}
 
+impl fmt::Display for Timings {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let all = self.first + self.second + self.third;
+        write!(
+            f,
+            "{:>11} ({:>11}, {:>11}, {:>11}) => [{:6} verts, {:6} faces]",
+            all.display_ms(),
+            self.first.display_ms(),
+            self.second.display_ms(),
+            self.third.display_ms(),
+            self.vertices,
+            self.faces,
+        )
+    }
+}
 
-// mod benchi {
-//     extern crate test;
+impl ops::Add for Timings {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Timings {
+            first: self.first + other.first,
+            second: self.second + other.second,
+            third: self.third + other.third,
+            vertices: self.vertices + other.vertices,
+            faces: self.faces + other.faces,
+        }
+    }
+}
 
-//     use self::test::Bencher;
-//     use super::*;
-//     use core::shape::Mandelbulb;
+/// Per vertex data in the generated mesh.
+#[derive(Copy, Clone)]
+pub struct Vertex {
+    position: [f32; 3],
+    normal: [f32; 3],
+    distance_from_surface: f32,
+}
 
-//     #[bench]
-//     fn bench_mandelbulb_10(b: &mut Bencher) {
-//         let shape = Mandelbulb::classic(5, 2.5);
-//         b.iter(|| MeshBuffer::generate_for_box(
-//             &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-//             &shape,
-//             10,
-//         ))
-//     }
-
-//     // #[bench]
-//     // fn bench_mandelbulb_25(b: &mut Bencher) {
-//     //     let shape = Mandelbulb::classic(5, 2.5);
-//     //     b.iter(|| MeshBuffer::generate_for_box(
-//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-//     //         &shape,
-//     //         25,
-//     //     ))
-//     // }
-
-//     // #[bench]
-//     // fn bench_mandelbulb_50(b: &mut Bencher) {
-//     //     let shape = Mandelbulb::classic(5, 2.5);
-//     //     b.iter(|| MeshBuffer::generate_for_box(
-//     //         &(Point3::new(-1.2, -1.2, -1.2) .. Point3::new(1.2, 1.2, 1.2)),
-//     //         &shape,
-//     //         50,
-//     //     ))
-//     // }
-
-//     #[bench]
-//     fn classic_5(b: &mut Bencher) {
-//         let shape = Mandelbulb::classic(5, 2.5);
-//         let points = [
-//             Point3::new(0.0, 0.0, 0.0),
-//             Point3::new(1.0, 0.0, 0.0),
-//             Point3::new(0.0, 1.0, 0.0),
-//             Point3::new(0.0, 0.0, 1.0),
-//             Point3::new(0.3, 0.3, 0.4),
-//         ];
-
-//         b.iter(|| {
-//             points.iter().map(|&p| shape.min_distance_from(p)).sum::<f32>()
-//         })
-//     }
-// }
+implement_vertex!(Vertex, position, normal, distance_from_surface);

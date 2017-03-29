@@ -2,7 +2,7 @@ use glium::backend::Facade;
 use glium::Program;
 
 use errors::*;
-use core::Shape;
+use shape::Shape;
 use util::gl;
 
 /// Stores resources that needs to be loaded only once.
