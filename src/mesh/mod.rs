@@ -253,7 +253,7 @@ impl ShapeMesh {
                     y as f32 * size_vertical,
                     0.0,
                 ) + center_diff;
-                
+
                 vec.push(
                     Point3::from_homogeneous(
                         inv_view_trans * center.to_homogeneous()

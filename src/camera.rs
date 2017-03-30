@@ -87,7 +87,7 @@ impl Camera {
         self.projection.transformation_matrix()
     }
 
-    /// returns the top left and bottom right bounding box points of the 
+    /// returns the top left and bottom right bounding box points of the
     /// (projected) near plane
     pub fn get_near_plane_bb(&self) -> (Point3<f32>, Point3<f32>) {
         let frustum_height = self.projection.get_height_of_near_plane();
