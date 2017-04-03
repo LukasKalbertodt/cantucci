@@ -186,21 +186,7 @@ impl<'a, L, I> NodeEntry<'a, L, I> {
     pub fn children(&self) -> Option<ArrayVec<[Self; 8]>> {
         match *self.node {
             Octnode::SubTree { ref children, ..} => {
-                let start = self.span.start;
-                let end = self.span.end;
-                let center = start + (self.span.end - start) / 2.0;
-
-                let spans = [
-                    start .. center,
-                    Point3 { z: center.z, .. start } .. Point3 { z: end.z, .. center },
-                    Point3 { y: center.y, .. start } .. Point3 { y: end.y, .. center },
-                    Point3 { x: start.x, .. center } .. Point3 { x: center.x, .. end },
-                    Point3 { x: center.x, .. start } .. Point3 { x: end.x, .. center },
-                    Point3 { y: start.y, .. center } .. Point3 { y: center.y, .. end },
-                    Point3 { z: start.z, .. center } .. Point3 { z: center.z, .. end },
-                    center .. end,
-                ];
-
+                let spans = create_spans(self.span());
                 Some(children
                     .iter()
                     .zip(&spans)
@@ -280,7 +266,7 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
     pub fn into_inner_parts(self) -> Option<(&'a mut Option<I>, ArrayVec<[Self; 8]>)> {
         match *self.node {
             Octnode::SubTree { ref mut children, ref mut data } => {
-                let spans = Self::create_spans(self.span);
+                let spans = create_spans(self.span);
                 let children = children
                     .iter_mut()
                     .zip(&spans)
@@ -307,7 +293,7 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
         // http://stackoverflow.com/q/42397056/2408867
         match *self.node {
             Octnode::SubTree { ref mut children, .. } => {
-                let spans = Self::create_spans(self.span);
+                let spans = create_spans(self.span);
                 Some(children
                     .iter_mut()
                     .zip(&spans)
@@ -322,24 +308,6 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
             },
             _ => None,
         }
-    }
-
-    /// Creates 8 equally sized children spans of a passed parent span. The spans are defined
-    /// in a way that will be no gaps between them due to floating point precision errors.
-    pub fn create_spans(parent_span: Range<Point3<f32>>) -> [Range<Point3<f32>>; 8] {
-        let start = parent_span.start;
-        let end = parent_span.end;
-        let center = start + (parent_span.end - start) / 2.0;
-        [
-            start .. center,
-            Point3 { z: center.z, .. start } .. Point3 { z: end.z, .. center },
-            Point3 { y: center.y, .. start } .. Point3 { y: end.y, .. center },
-            Point3 { x: start.x, .. center } .. Point3 { x: center.x, .. end },
-            Point3 { x: center.x, .. start } .. Point3 { x: end.x, .. center },
-            Point3 { y: start.y, .. center } .. Point3 { y: center.y, .. end },
-            Point3 { z: start.z, .. center } .. Point3 { z: center.z, .. end },
-            center .. end,
-        ]
     }
 
     /// Splits the `self` leaf into eight children and returns the data of
@@ -369,4 +337,22 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
 
         out
     }
+}
+
+/// Creates 8 equally sized children spans of a passed parent span. The spans are defined
+/// in a way that will be no gaps between them due to floating point precision errors.
+pub fn create_spans(parent_span: Range<Point3<f32>>) -> [Range<Point3<f32>>; 8] {
+    let start = parent_span.start;
+    let end = parent_span.end;
+    let center = start + (parent_span.end - start) / 2.0;
+    [
+        start .. center,
+        Point3 { z: center.z, .. start } .. Point3 { z: end.z, .. center },
+        Point3 { y: center.y, .. start } .. Point3 { y: end.y, .. center },
+        Point3 { x: start.x, .. center } .. Point3 { x: center.x, .. end },
+        Point3 { x: center.x, .. start } .. Point3 { x: end.x, .. center },
+        Point3 { y: start.y, .. center } .. Point3 { y: center.y, .. end },
+        Point3 { z: start.z, .. center } .. Point3 { z: center.z, .. end },
+        center .. end,
+    ]
 }

@@ -93,11 +93,11 @@ impl ShapeMesh {
     /// Updates the mesh representing the shape. It increases resolution dynamically when
     /// camera is close to the objects surface.
     pub fn update<F: Facade>(&mut self, facade: &F, camera: &Camera) -> Result<()> {
-        // Constant that corresponds to the amount of focus points used to determine which octree
-        // nodes are to be split (drawn in higher resolution). In the end FOCUS_POINTS^2 points
-        // are distributed over the near plane.
+        /// Constant that corresponds to the amount of focus points used to determine which octree
+        /// nodes are to be split (drawn in higher resolution). In the end FOCUS_POINTS² points
+        /// are distributed over the near plane.
         const FOCUS_POINTS: u8 = 5;
-        // get focus points on the near plane. Through these points, distances from the camera to
+        // Get focus points on the near plane. Through these points, distances from the camera to
         // nodes of the octree are calculated. When the distance is under a certain threshold, that
         // particular node is redrawn with higher resolution.
         let focii = self.get_focii(camera, FOCUS_POINTS);
@@ -219,11 +219,8 @@ impl ShapeMesh {
                 &MeshStatus::Ready(ref view) |
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
                     view.draw(surface, camera, env, &self.renderer)?;
-                    // TODO: Debug mode can be removed soon.
                     if self.show_debug {
-                        let focus_points = self.get_focii(camera, 1);
-                        let highlight = focus_points.len() > 0 && span.contains(focus_points[0]);
-                        self.debug_octree.draw(surface, camera, span, highlight)?;
+                        self.debug_octree.draw(surface, camera, span, false)?;
                     }
                 }
                 _ => (),
@@ -234,7 +231,7 @@ impl ShapeMesh {
     }
 
     /// Returns points on the near plane distributed in a grid. These points are given
-    /// in world coordinates. The number of points returned is focus_points^2.
+    /// in world coordinates. The number of points returned is focus_points².
     pub fn get_focii(&self, camera: &Camera, focus_points: u8) -> Vec<Point3<f32>> {
         const EPSILON: f32 = 0.000_001;
         const MAX_ITERS: u64 = 100;
@@ -247,7 +244,7 @@ impl ShapeMesh {
 
         let inv_view_trans = camera.inv_view_transform();
 
-        let vec = iter::cube(focus_points as u32)
+        iter::cube(focus_points as u32)
             .map(|(x, y, _)| {
                 let center = top_left + Vector3::new(
                     x as f32 * size_horizontal,
@@ -272,8 +269,7 @@ impl ShapeMesh {
                 }
                 false
             })
-            .collect();
-        vec
+            .collect()
     }
 }
 
