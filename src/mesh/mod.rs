@@ -5,6 +5,7 @@ use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use threadpool::ThreadPool;
+use util::iter;
 
 use camera::Camera;
 use math::*;
@@ -89,11 +90,16 @@ impl ShapeMesh {
         &*self.shape
     }
 
-    /// Updates the mesh representing the shape.
+    /// Updates the mesh representing the shape. It increases resolution dynamically when
+    /// camera is close to the objects surface.
     pub fn update<F: Facade>(&mut self, facade: &F, camera: &Camera) -> Result<()> {
-        // increase resolution dynamically if there is a cube responding to the focii
-        // determines how many focus points are used to determine which nodes are to be split
+        // Constant that corresponds to the amount of focus points used to determine which octree
+        // nodes are to be split (drawn in higher resolution). In the end FOCUS_POINTS^2 points
+        // are distributed over the near plane.
         const FOCUS_POINTS: u8 = 5;
+        // get focus points on the near plane. Through these points, distances from the camera to
+        // nodes of the octree are calculated. When the distance is under a certain threshold, that
+        // particular node is redrawn with higher resolution.
         let focii = self.get_focii(camera, FOCUS_POINTS);
         for focus in focii {
             if let Some(mut leaf) = self.tree.leaf_around_mut(focus) {
@@ -106,7 +112,7 @@ impl ShapeMesh {
                     let dist = camera.position.distance(focus);
                     let span = leaf.span();
                     let threshold = 2.0 * (span.end.x - span.start.x).abs();
-                    // if we are near enough to the surface, increase resolution
+                    // If we are near enough to the surface, increase resolution.
                     if dist < threshold {
                         leaf.split(None);
                     }
@@ -143,18 +149,18 @@ impl ShapeMesh {
         // of space (see #9, #8)
 
 
-        // Here we simply start a mesh generation job for each empty leaf node
+        // Here we simply start a mesh generation job for each empty leaf node.
         let empty_leaves = self.tree.iter_mut()
             .filter_map(|n| n.into_leaf())
             .filter(|&(_, ref leaf_data)| leaf_data.is_none());
         for (span, leaf_data) in empty_leaves {
             const RESOLUTION: u32 = 64;
 
-            // Prepare values to be moved into the closure
+            // Prepare values to be moved into the closure.
             let tx = self.mesh_tx.clone();
             let shape = self.shape.clone();
 
-            // Generate the raw buffers on another thread
+            // Generate the raw buffers on another thread.
             self.thread_pool.execute(move || {
                 let buf = MeshBuffer::generate_for_box(&span, &*shape, RESOLUTION);
                 tx.send((span.center(), buf))
@@ -202,23 +208,21 @@ impl ShapeMesh {
         camera: &Camera,
         env: &Environment,
     ) -> Result<()> {
-        // Visit each node of the tree
+        // Visit each node of the tree.
         // TODO: we might want visit the nodes in a different order (see #16)
-
-        let focus_point = self.get_focus(camera);
 
         let it = self.tree.iter()
             .filter_map(|n| n.leaf_data().map(|data| (data, n.span())));
         for (leaf_data, span) in it {
             match leaf_data {
-                // If there is a view available, render it
+                // If there is a view available, render it.
                 &MeshStatus::Ready(ref view) |
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
                     view.draw(surface, camera, env, &self.renderer)?;
+                    // TODO: Debug mode can be removed soon.
                     if self.show_debug {
-                        let highlight = focus_point
-                            .map(|fp| span.contains(fp))
-                            .unwrap_or(false);
+                        let focus_points = self.get_focii(camera, 1);
+                        let highlight = focus_points.len() > 0 && span.contains(focus_points[0]);
                         self.debug_octree.draw(surface, camera, span, highlight)?;
                     }
                 }
@@ -229,62 +233,47 @@ impl ShapeMesh {
         Ok(())
     }
 
-    /// Returns equally distributed points on the near_plane. The number of points
-    /// returned is focus_points².
+    /// Returns points on the near plane distributed in a grid. These points are given
+    /// in world coordinates. The number of points returned is focus_points^2.
     pub fn get_focii(&self, camera: &Camera, focus_points: u8) -> Vec<Point3<f32>> {
-        // sets the amount of focus points that may cause a split event
         const EPSILON: f32 = 0.000_001;
         const MAX_ITERS: u64 = 100;
 
-        let bb = camera.get_near_plane_bb();
-        let frustum_width = bb.1.x - bb.0.x;
-        let frustum_height = bb.1.y - bb.0.y;
-        let size_horizontal = frustum_width/focus_points as f32;
-        let size_vertical = frustum_height/focus_points as f32;
-        let center_diff = (bb.1 - bb.0)/(2.0*focus_points as f32);
+        let (top_left, bottom_right) = camera.near_plane_bb();
+        let (frustum_width, frustum_height) = camera.projection.near_plane_dimension();
+        let size_horizontal = frustum_width / focus_points as f32;
+        let size_vertical = frustum_height / focus_points as f32;
+        let center_diff = (bottom_right - top_left) / (2.0 * focus_points as f32);
 
-        let inv_view_trans = camera.view_transform().invert().unwrap();
+        let inv_view_trans = camera.inv_view_transform();
 
-        let mut vec = Vec::new();
-        for y in 0..focus_points {
-            for x in 0..focus_points {
-                let center = bb.0 + Vector3::new(
+        let vec = iter::cube(focus_points as u32)
+            .map(|(x, y, _)| {
+                let center = top_left + Vector3::new(
                     x as f32 * size_horizontal,
                     y as f32 * size_vertical,
                     0.0,
                 ) + center_diff;
 
-                vec.push(
-                    Point3::from_homogeneous(
-                        inv_view_trans * center.to_homogeneous()
-                    )
-                );
-            }
-        }
+                Point3::from_homogeneous(
+                    inv_view_trans * center.to_homogeneous()
+                )
+            })
+            .filter(|p| {
+                let mut pos = camera.position;
+                let dir = (p - camera.position).normalize();
 
-        let mut ret = Vec::new();
-        for point in vec {
-            let mut pos = camera.position;
-            let dir = (point - camera.position).normalize();
-
-            for _ in 0..MAX_ITERS {
-                let distance = self.shape.min_distance_from(pos);
-                pos += dir * distance;
-                if distance < EPSILON {
-                    ret.push(pos);
-                    break;
+                for _ in 0..MAX_ITERS {
+                    let distance = self.shape.min_distance_from(pos);
+                    pos += dir * distance;
+                    if distance < EPSILON {
+                        return true;
+                    }
                 }
-            }
-        }
-        ret
-    }
-
-    // Wrapper method for just getting the focus along the regular camera direction vector
-    pub fn get_focus(&self, camera: &Camera) -> Option<Point3<f32>> {
-        for point in Self::get_focii(self, camera, 1) {
-            return Some(point);
-        }
-        None
+                false
+            })
+            .collect();
+        vec
     }
 }
 
