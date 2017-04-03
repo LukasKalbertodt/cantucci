@@ -97,6 +97,7 @@ impl ShapeMesh {
         /// nodes are to be split (drawn in higher resolution). In the end FOCUS_POINTS² points
         /// are distributed over the near plane.
         const FOCUS_POINTS: u8 = 5;
+
         // Get focus points on the near plane. Through these points, distances from the camera to
         // nodes of the octree are calculated. When the distance is under a certain threshold, that
         // particular node is redrawn with higher resolution.
@@ -244,8 +245,8 @@ impl ShapeMesh {
 
         let inv_view_trans = camera.inv_view_transform();
 
-        iter::cube(focus_points as u32)
-            .map(|(x, y, _)| {
+        iter::square(focus_points as u32)
+            .map(|(x, y)| {
                 let center = top_left + Vector3::new(
                     x as f32 * size_horizontal,
                     y as f32 * size_vertical,
@@ -256,7 +257,7 @@ impl ShapeMesh {
                     inv_view_trans * center.to_homogeneous()
                 )
             })
-            .filter(|p| {
+            .filter_map(|p| {
                 let mut pos = camera.position;
                 let dir = (p - camera.position).normalize();
 
@@ -264,10 +265,10 @@ impl ShapeMesh {
                     let distance = self.shape.min_distance_from(pos);
                     pos += dir * distance;
                     if distance < EPSILON {
-                        return true;
+                        return Some(pos);
                     }
                 }
-                false
+                None
             })
             .collect()
     }
