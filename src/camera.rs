@@ -81,10 +81,32 @@ impl Camera {
         )
     }
 
+    /// Returns the inverse transformation matrix from view space.
+    pub fn inv_view_transform(&self) -> Matrix4<f32> {
+        self.view_transform().invert().unwrap()
+    }
+
     /// Returns the matrix representing the transformation into projection
     /// space.
     pub fn proj_transform(&self) -> Matrix4<f32> {
         self.projection.transformation_matrix()
+    }
+
+    /// Returns the top left and bottom right bounding box limits of the
+    /// near plane in view space.
+    pub fn near_plane_bb(&self) -> (Point3<f32>, Point3<f32>) {
+        let (frustum_width, frustum_height) = self.projection.near_plane_dimension();
+        let top_left = Point3::new(
+            -frustum_width / 2.0,
+            -frustum_height / 2.0,
+            -self.projection.near_plane,
+        );
+        let bottom_right = Point3::new(
+            frustum_width / 2.0,
+            frustum_height / 2.0,
+            -self.projection.near_plane,
+        );
+        (top_left, bottom_right)
     }
 }
 
@@ -161,5 +183,10 @@ impl Projection {
             self.near_plane,
             self.far_plane,
         )
+    }
+    /// Returns the dimensions of the near plane in view space.
+    pub fn near_plane_dimension(&self) -> (f32, f32) {
+        let height = 2.0 * self.near_plane * (self.fov * 0.5).tan();
+        (height * self.aspect_ratio, height)
     }
 }

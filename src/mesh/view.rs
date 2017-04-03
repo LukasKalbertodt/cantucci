@@ -2,6 +2,7 @@ use glium::backend::Facade;
 use glium::index::PrimitiveType;
 use glium::{self, DepthTest, Surface, DrawParameters};
 use glium::{VertexBuffer, IndexBuffer};
+use glium::draw_parameters::BackfaceCullingMode;
 
 use camera::Camera;
 use env::Environment;
@@ -50,6 +51,7 @@ impl MeshView {
                 test: DepthTest::IfLess,
                 .. Default::default()
             },
+            backface_culling: BackfaceCullingMode::CullClockwise,
             .. DrawParameters::default()
         };
 

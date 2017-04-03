@@ -1,10 +1,11 @@
 use glium::backend::Facade;
 use glium::Surface;
-use glium::glutin::{Event, MouseButton, ElementState, VirtualKeyCode};
+use glium::glutin::{Event, ElementState, VirtualKeyCode};
 use num_cpus;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use threadpool::ThreadPool;
+use util::iter;
 
 use camera::Camera;
 use math::*;
@@ -43,7 +44,6 @@ pub struct ShapeMesh {
     new_meshes: Receiver<(Point3<f32>, (MeshBuffer, Timings))>,
     mesh_tx: Sender<(Point3<f32>, (MeshBuffer, Timings))>,
     active_jobs: u64,
-    split_next_time: bool,
     show_debug: bool,
 
     // These are just for debugging/time measuring purposes
@@ -80,7 +80,6 @@ impl ShapeMesh {
             new_meshes: rx,
             mesh_tx: tx,
             active_jobs: 0,
-            split_next_time: false,
             show_debug: true,
             batch_timings: Timings::default(),
             finished_jobs: 0,
@@ -91,16 +90,36 @@ impl ShapeMesh {
         &*self.shape
     }
 
-    /// Updates the mesh representing the shape.
-    pub fn update<F: Facade>(&mut self, facade: &F, camarero: &Camera) -> Result<()> {
-        if self.split_next_time {
-            self.split_next_time = false;
-            let node = self.get_focus(camarero)
-                .and_then(|focus| self.tree.leaf_around_mut(focus));
-            if let Some(mut node) = node {
-                node.split(None);
+    /// Updates the mesh representing the shape. It increases resolution dynamically when
+    /// camera is close to the objects surface.
+    pub fn update<F: Facade>(&mut self, facade: &F, camera: &Camera) -> Result<()> {
+        /// Constant that corresponds to the amount of focus points used to determine which octree
+        /// nodes are to be split (drawn in higher resolution). In the end FOCUS_POINTS² points
+        /// are distributed over the near plane.
+        const FOCUS_POINTS: u8 = 5;
+        // Get focus points on the near plane. Through these points, distances from the camera to
+        // nodes of the octree are calculated. When the distance is under a certain threshold, that
+        // particular node is redrawn with higher resolution.
+        let focii = self.get_focii(camera, FOCUS_POINTS);
+        for focus in focii {
+            if let Some(mut leaf) = self.tree.leaf_around_mut(focus) {
+                let do_split = if let &Some(MeshStatus::Ready(_)) = leaf.leaf_data().unwrap() {
+                    true
+                } else {
+                    false
+                };
+                if do_split {
+                    let dist = camera.position.distance(focus);
+                    let span = leaf.span();
+                    let threshold = 2.0 * (span.end.x - span.start.x).abs();
+                    // If we are near enough to the surface, increase resolution.
+                    if dist < threshold {
+                        leaf.split(None);
+                    }
+                }
             }
         }
+
         let jobs_before = self.active_jobs;
         let finished_jobs_before = self.finished_jobs;
 
@@ -130,18 +149,18 @@ impl ShapeMesh {
         // of space (see #9, #8)
 
 
-        // Here we simply start a mesh generation job for each empty leaf node
+        // Here we simply start a mesh generation job for each empty leaf node.
         let empty_leaves = self.tree.iter_mut()
             .filter_map(|n| n.into_leaf())
             .filter(|&(_, ref leaf_data)| leaf_data.is_none());
         for (span, leaf_data) in empty_leaves {
             const RESOLUTION: u32 = 64;
 
-            // Prepare values to be moved into the closure
+            // Prepare values to be moved into the closure.
             let tx = self.mesh_tx.clone();
             let shape = self.shape.clone();
 
-            // Generate the raw buffers on another thread
+            // Generate the raw buffers on another thread.
             self.thread_pool.execute(move || {
                 let buf = MeshBuffer::generate_for_box(&span, &*shape, RESOLUTION);
                 tx.send((span.center(), buf))
@@ -189,48 +208,68 @@ impl ShapeMesh {
         camera: &Camera,
         env: &Environment,
     ) -> Result<()> {
-        // Visit each node of the tree
+        // Visit each node of the tree.
         // TODO: we might want visit the nodes in a different order (see #16)
-
-        let focus_point = self.get_focus(camera);
 
         let it = self.tree.iter()
             .filter_map(|n| n.leaf_data().map(|data| (data, n.span())));
         for (leaf_data, span) in it {
             match leaf_data {
-                // If there is a view available, render it
+                // If there is a view available, render it.
                 &MeshStatus::Ready(ref view) |
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
                     view.draw(surface, camera, env, &self.renderer)?;
                     if self.show_debug {
-                        let highlight = focus_point
-                            .map(|fp| span.contains(fp))
-                            .unwrap_or(false);
-                        self.debug_octree.draw(surface, camera, span, highlight)?;
+                        self.debug_octree.draw(surface, camera, span, false)?;
                     }
                 }
                 _ => (),
             }
         }
 
-
         Ok(())
     }
 
-    /// Returns the point on the shape's surface the camera is currently looking at
-    pub fn get_focus(&self, camera: &Camera) -> Option<Point3<f32>> {
+    /// Returns points on the near plane distributed in a grid. These points are given
+    /// in world coordinates. The number of points returned is focus_points².
+    pub fn get_focii(&self, camera: &Camera, focus_points: u8) -> Vec<Point3<f32>> {
         const EPSILON: f32 = 0.000_001;
         const MAX_ITERS: u64 = 100;
 
-        let mut pos = camera.position;
-        for _ in 0..MAX_ITERS {
-            let distance = self.shape.min_distance_from(pos);
-            pos += camera.direction() * distance;
-            if distance < EPSILON {
-                break;
-            }
-        }
-        Some(pos)
+        let (top_left, bottom_right) = camera.near_plane_bb();
+        let (frustum_width, frustum_height) = camera.projection.near_plane_dimension();
+        let size_horizontal = frustum_width / focus_points as f32;
+        let size_vertical = frustum_height / focus_points as f32;
+        let center_diff = (bottom_right - top_left) / (2.0 * focus_points as f32);
+
+        let inv_view_trans = camera.inv_view_transform();
+
+        iter::cube(focus_points as u32)
+            .map(|(x, y, _)| {
+                let center = top_left + Vector3::new(
+                    x as f32 * size_horizontal,
+                    y as f32 * size_vertical,
+                    0.0,
+                ) + center_diff;
+
+                Point3::from_homogeneous(
+                    inv_view_trans * center.to_homogeneous()
+                )
+            })
+            .filter(|p| {
+                let mut pos = camera.position;
+                let dir = (p - camera.position).normalize();
+
+                for _ in 0..MAX_ITERS {
+                    let distance = self.shape.min_distance_from(pos);
+                    pos += dir * distance;
+                    if distance < EPSILON {
+                        return true;
+                    }
+                }
+                false
+            })
+            .collect()
     }
 }
 
@@ -238,10 +277,6 @@ impl EventHandler for ShapeMesh {
 
     fn handle_event(&mut self, e: &Event) -> EventResponse {
         match *e {
-            Event::MouseInput(ElementState::Released, MouseButton::Left) => {
-                self.split_next_time = true;
-                EventResponse::Continue
-            },
             Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::G)) => {
                 self.show_debug = !self.show_debug;
                 EventResponse::Continue
