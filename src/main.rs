@@ -32,7 +32,7 @@ fn main() {
     use term_painter::ToStyle;
 
     // Init logger implementation
-    env_logger::init().expect("failed to initialize logger");
+    env_logger::init();
 
     // Create whole app and run it, if it succeeds
     let res = App::init().and_then(|mut app| app.run());
