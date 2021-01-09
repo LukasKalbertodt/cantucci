@@ -74,7 +74,7 @@ impl Camera {
 
     /// Returns the matrix representing the transformation into view space.
     pub fn view_transform(&self) -> Matrix4<f32> {
-        Matrix4::look_at(
+        Matrix4::look_at_rh(
             self.position,
             self.position + self.direction,
             Vector3::new(0.0, 0.0, 1.0),

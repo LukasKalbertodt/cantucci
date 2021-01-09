@@ -65,7 +65,7 @@ impl MeshBuffer {
         // the cells we calculate and save the estimated minimal distance from
         // the shape.
         let dists = GridTable::fill_with(resolution + 1, |x, y, z| {
-            let v = Vector3::new(x, y, z).cast::<f32>() / (resolution as f32);
+            let v = Vector3::new(x, y, z).cast::<f32>().unwrap() / (resolution as f32);
             let p = span.start + (span.end - span.start).mul_element_wise(v);
 
             shape.min_distance_from(p)
@@ -94,8 +94,10 @@ impl MeshBuffer {
                 let step = (span.end - span.start) / resolution as f32;
 
                 // World position of this cell's lower corner
-                let p0 = span.start
-                    + Vector3::new(x, y, z).cast::<f32>().mul_element_wise(step);
+                let p0 = span.start + Vector3::new(x, y, z)
+                    .cast::<f32>()
+                    .unwrap()
+                    .mul_element_wise(step);
 
                 [
                     p0 + Vector3::new(   0.0,    0.0,    0.0),
@@ -249,7 +251,7 @@ impl MeshBuffer {
             };
 
             raw_vbuf.push(Vertex {
-                position: p.to_vec().cast::<f32>().to_arr(),
+                position: p.to_vec().to_arr(),
                 normal: normal.to_arr(),
                 distance_from_surface: dist_p,
             });
@@ -367,13 +369,7 @@ impl MeshBuffer {
             timings,
         );
 
-        (
-            MeshBuffer {
-                raw_vbuf: raw_vbuf,
-                raw_ibuf: raw_ibuf,
-            },
-            timings
-        )
+        (MeshBuffer { raw_vbuf, raw_ibuf }, timings)
     }
 
     pub fn raw_vbuf(&self) -> &[Vertex] {
