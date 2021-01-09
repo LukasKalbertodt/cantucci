@@ -45,7 +45,7 @@ impl EventHandler for QuitHandler {
 // the handlers handle those events.
 pub fn poll_events_with(
     facade: &GlutinFacade,
-    handlers: &mut [&mut EventHandler]
+    handlers: &mut [&mut dyn EventHandler]
 ) -> EventResponse {
     // We need to check if we handled at least one event
     let mut handled_at_least_one = false;

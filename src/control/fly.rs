@@ -79,12 +79,12 @@ impl CamControl for Fly {
         &mut self.cam.projection
     }
 
-    fn update(&mut self, delta: f32, shape: &Shape) {
+    fn update(&mut self, delta: f32, shape: &dyn Shape) {
         fn update_speed(speed: &mut f32, accel: f32, delta: f32) {
             *speed = lerp(
                 *speed,
                 accel * MAX_MOVE_SPEED,
-                (1.0 - 2.0f32.powf(-delta / MOVE_DELAY)),
+                1.0 - 2.0f32.powf(-delta / MOVE_DELAY),
             );
         }
 
@@ -113,7 +113,7 @@ impl CamControl for Fly {
         );
     }
 
-    fn as_event_handler(&mut self) -> &mut EventHandler {
+    fn as_event_handler(&mut self) -> &mut dyn EventHandler {
         self
     }
 

@@ -17,7 +17,7 @@ pub struct Renderer {
 
 impl Renderer {
     /// Creates all global resources (currently the OpenGL program only).
-    pub fn new<F: Facade>(facade: &F, shape: &Shape) -> Result<Self> {
+    pub fn new<F: Facade>(facade: &F, shape: &dyn Shape) -> Result<Self> {
         let program = gl::load_program_with_shape(facade, "iso-surface", shape)
             .chain_err(|| "loading program for shape renderer failed")?;
 

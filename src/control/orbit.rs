@@ -76,17 +76,17 @@ impl CamControl for Orbit {
         &mut self.cam.projection
     }
 
-    fn update(&mut self, delta: f32, _: &Shape) {
+    fn update(&mut self, delta: f32, _: &dyn Shape) {
         // Update the theta and phi turning speeds
         self.theta_speed = lerp(
             self.theta_speed,
             self.theta_accel * MAX_TURN_SPEED.0,
-            (1.0 - 2.0f32.powf(-delta / TURN_DELAY)),
+            1.0 - 2.0f32.powf(-delta / TURN_DELAY),
         );
         self.phi_speed = lerp(
             self.phi_speed,
             self.phi_accel * MAX_TURN_SPEED.0 * 2.0,
-            (1.0 - 2.0f32.powf(-delta / TURN_DELAY)),
+            1.0 - 2.0f32.powf(-delta / TURN_DELAY),
         );
 
         // Update actual turning position with those calculates speeds and
@@ -104,7 +104,7 @@ impl CamControl for Orbit {
         self.update_distance(new_distance);
     }
 
-    fn as_event_handler(&mut self) -> &mut EventHandler {
+    fn as_event_handler(&mut self) -> &mut dyn EventHandler {
         self
     }
 

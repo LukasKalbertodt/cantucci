@@ -16,7 +16,7 @@ const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
 pub struct App {
     facade: GlutinFacade,
-    control: Box<CamControl>,
+    control: Box<dyn CamControl>,
     mesh: ShapeMesh,
     env: Environment,
     print_fps: bool,
@@ -32,9 +32,9 @@ impl App {
             .chain_err(|| "failed to create GL context")?;
 
         let shape = if ::std::env::args().len() > 1 {
-            Arc::new(Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0)) as Arc<Shape>
+            Arc::new(Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0)) as Arc<dyn Shape>
         } else {
-            Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<Shape>
+            Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<dyn Shape>
         };
         let mesh = ShapeMesh::new(&facade, shape)?;
 

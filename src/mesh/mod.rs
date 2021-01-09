@@ -33,7 +33,7 @@ pub struct ShapeMesh {
     renderer: Renderer,
 
     /// The shape this mesh represents.
-    shape: Arc<Shape>,
+    shape: Arc<dyn Shape>,
 
     /// Show the borders of the octree
     debug_octree: DebugView,
@@ -52,7 +52,7 @@ pub struct ShapeMesh {
 }
 
 impl ShapeMesh {
-    pub fn new<F: Facade>(facade: &F, shape: Arc<Shape>) -> Result<Self> {
+    pub fn new<F: Facade>(facade: &F, shape: Arc<dyn Shape>) -> Result<Self> {
         // Setup an empty tree and split the first two levels which results in
         // 8² = 64 children
         let mut tree = Octree::spanning(shape.bounding_box());
@@ -86,7 +86,7 @@ impl ShapeMesh {
         })
     }
 
-    pub fn shape(&self) -> &Shape {
+    pub fn shape(&self) -> &dyn Shape {
         &*self.shape
     }
 
