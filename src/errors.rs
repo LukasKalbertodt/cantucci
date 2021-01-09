@@ -1,5 +1,9 @@
+// TODO: this is only temporary until we switch to a newer error handling library.
+#![allow(deprecated)]
+
 use glium;
 use std::io;
+
 
 error_chain! {
     foreign_links {
