@@ -8,7 +8,6 @@
 extern crate cgmath;
 extern crate env_logger;
 extern crate num_cpus;
-extern crate term_painter;
 extern crate threadpool;
 
 
@@ -28,8 +27,6 @@ mod util;
 fn main() {
     use app::App;
     use std::cmp::min;
-    use term_painter::Color::*;
-    use term_painter::ToStyle;
 
     // Init logger implementation
     env_logger::init();
@@ -41,10 +38,10 @@ fn main() {
     if let Err(error_chain) = res {
         println!("Something went wrong ☹ ! Here is the backtrace:");
         for (i, e) in error_chain.iter().enumerate() {
-            println!(
-                "{: >2$} {}",
-                Yellow.paint(if i == 0 { "→" } else { "⤷" }),
-                Red.paint(e),
+            bunt::println!(
+                "{[yellow]: >2$} {[red]}",
+                if i == 0 { "→" } else { "⤷" },
+                e,
                 2 * min(i, 7) + 1,
             );
         }
