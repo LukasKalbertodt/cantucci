@@ -172,7 +172,7 @@ impl App {
 /// success or failure of said action.
 fn create_context() -> Result<GlutinFacade> {
     use glium::glutin::{self, get_primary_monitor, GlRequest};
-    use glium::{self, DisplayBuild};
+    use glium::DisplayBuild;
 
     // Check resolution of monitor
     let monitor = get_primary_monitor();
