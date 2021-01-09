@@ -2,7 +2,7 @@ use glium::backend::Facade;
 use glium::Surface;
 use glium::glutin::{Event, ElementState, VirtualKeyCode};
 use num_cpus;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::{array::IntoIter, sync::mpsc::{channel, Receiver, Sender}};
 use std::sync::Arc;
 use threadpool::ThreadPool;
 use util::iter;
@@ -57,7 +57,7 @@ impl ShapeMesh {
         // 8² = 64 children
         let mut tree = Octree::spanning(shape.bounding_box());
         let _ = tree.root_mut().split(None);
-        for mut child in tree.root_mut().into_children().unwrap() {
+        for mut child in IntoIter::new(tree.root_mut().into_children().unwrap()) {
             child.split(None);
         }
 
@@ -72,10 +72,10 @@ impl ShapeMesh {
         let debug_octree = DebugView::new(facade)?;
 
         Ok(ShapeMesh {
-            tree: tree,
-            renderer: renderer,
-            shape: shape,
-            debug_octree: debug_octree,
+            tree,
+            renderer,
+            shape,
+            debug_octree,
             thread_pool: pool,
             new_meshes: rx,
             mesh_tx: tx,
@@ -178,9 +178,7 @@ impl ShapeMesh {
                 Some(MeshStatus::Ready(view)) => Some(view),
                 _ => None,
             };
-            *leaf_data = Some(MeshStatus::Requested {
-                old_view: old_view,
-            });
+            *leaf_data = Some(MeshStatus::Requested { old_view });
         }
 
         if jobs_before != self.active_jobs {

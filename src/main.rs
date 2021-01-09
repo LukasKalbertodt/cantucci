@@ -1,10 +1,10 @@
 // We apparently need this for `error-chain`
 #![recursion_limit = "1024"]
+#![feature(array_value_iter, array_map, const_in_array_repeat_expressions)]
 
 #[macro_use] extern crate error_chain;
 #[macro_use] extern crate glium;
 #[macro_use] extern crate log;
-extern crate arrayvec;
 extern crate cgmath;
 extern crate env_logger;
 extern crate num_cpus;

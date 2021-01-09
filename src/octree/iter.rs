@@ -1,6 +1,5 @@
-use arrayvec::ArrayVec;
-
 use super::{NodeEntry, NodeEntryMut, Octree, Span};
+use std::array::IntoIter;
 
 
 /// An iterator over *im*mutable references of nodes
@@ -27,7 +26,7 @@ impl<'a, L: 'a, I: 'a> Iterator for Iter<'a, L, I> {
     fn next(&mut self) -> Option<Self::Item> {
         self.to_visit.pop().map(|next| {
             if let Some(children) = next.children() {
-                self.to_visit.extend(ArrayVec::from(children));
+                self.to_visit.extend(IntoIter::new(children));
             }
             next
         })
@@ -99,8 +98,8 @@ impl<'a, L: 'a, I: 'a> Iterator for IterMut<'a, L, I> {
             } else {
                 let span = next.span();
                 let (data, children) = next.into_inner_parts().unwrap();
-                self.to_visit.extend(ArrayVec::from(children));
-                IterElemMut::Inner { span: span, data: data }
+                self.to_visit.extend(IntoIter::new(children));
+                IterElemMut::Inner { span, data }
             }
         })
     }
