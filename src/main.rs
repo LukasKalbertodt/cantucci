@@ -2,7 +2,7 @@
 
 mod app;
 mod prelude;
-// mod camera;
+mod camera;
 // mod control;
 // mod env;
 // mod errors;

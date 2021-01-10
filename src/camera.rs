@@ -1,7 +1,8 @@
-use std::ops::Range;
-use cgmath;
+#![allow(dead_code)] // TODO
 
-use math::*;
+use std::ops::Range;
+use cgmath::{Matrix4, Point3, Rad, Vector3, prelude::*};
+
 
 /// This camera implementation always uses (0, 0, 1) as up-vector. Because the
 /// direction vector must never be linear dependent to the up-vector, we have
@@ -45,20 +46,13 @@ impl Camera {
         self.direction = dir.normalize();
 
         let (theta, phi) = self.spherical_coords();
-        let theta = Self::clamp_theta(theta);
+        let theta = clamp_theta(theta);
         self.look_at_sphere(theta, phi);
-    }
-
-    /// Clamps theta into the allowed range
-    fn clamp_theta(theta: Rad<f32>) -> Rad<f32> {
-        use std::f32::consts::PI;
-
-        clamp(theta, THETA_SAFE_EPSILON, Rad(PI) - THETA_SAFE_EPSILON)
     }
 
     /// Sets the direction vector from the given spherical coordinates
     pub fn look_at_sphere(&mut self, theta: Rad<f32>, phi: Rad<f32>) {
-        let theta = Self::clamp_theta(theta);
+        let theta = clamp_theta(theta);
 
         self.direction = Vector3::new(
             theta.sin() * phi.cos(),
@@ -110,6 +104,11 @@ impl Camera {
     }
 }
 
+/// Clamps theta into the allowed range
+fn clamp_theta(theta: Rad<f32>) -> Rad<f32> {
+    Rad(theta.0.clamp(THETA_SAFE_EPSILON.0, std::f32::consts::PI - THETA_SAFE_EPSILON.0))
+}
+
 /// Represents a specific projection that can be transformed by the selected
 /// rendering method.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -138,7 +137,7 @@ impl Projection {
         assert!(w > 0 && h > 0, "given screen dimension {:?} musn't be zero", (w, h));
 
         Projection {
-            fov: fov,
+            fov,
             aspect_ratio: (w as f32) / (h as f32),
             near_plane: proj_range.start,
             far_plane: proj_range.end,
