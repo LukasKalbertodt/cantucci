@@ -5,7 +5,6 @@ mod prelude;
 mod camera;
 // mod control;
 // mod env;
-// mod errors;
 // mod event;
 // mod math;
 // mod mesh;
