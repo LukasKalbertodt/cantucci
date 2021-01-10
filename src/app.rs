@@ -14,7 +14,7 @@
 
 use winit::{dpi::PhysicalSize, event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, window::Window};
 
-use crate::prelude::*;
+use crate::{event::{EventHandler, EventResponse, QuitHandler}, prelude::*};
 
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
@@ -36,14 +36,10 @@ pub(crate) async fn run() -> Result<()> {
             Event::RedrawRequested(_) => app.draw(),
             Event::LoopDestroyed => info!("Bye :-)"),
             Event::WindowEvent { event, .. } => {
-                match event {
-                    WindowEvent::Resized(new_size) => app.recreate_swap_chain(new_size),
-                    WindowEvent::CloseRequested | WindowEvent::Destroyed => {
-                        *control_flow = ControlFlow::Exit;
-                    }
-                    _ => {} // TODO: keyboard and mouse processing
+                let resp = app.handle_event(&event);
+                if resp == EventResponse::Quit {
+                    *control_flow = ControlFlow::Exit;
                 }
-
             }
             _ => {}
         }
@@ -125,6 +121,19 @@ impl App {
 
     fn draw(&self) {
 
+    }
+}
+
+impl EventHandler for App {
+    fn handle_event(&mut self, e: &WindowEvent) -> EventResponse {
+        if let WindowEvent::Resized(new_size) = e {
+            self.recreate_swap_chain(*new_size);
+            return EventResponse::Break;
+        }
+
+        crate::event::handle_with(e, &mut [
+            &mut QuitHandler
+        ])
     }
 }
 

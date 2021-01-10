@@ -5,7 +5,7 @@ mod prelude;
 mod camera;
 // mod control;
 // mod env;
-// mod event;
+mod event;
 // mod math;
 // mod mesh;
 // mod octree;

@@ -1,5 +1,4 @@
-use glium::backend::glutin_backend::GlutinFacade;
-use glium::glutin::Event;
+use winit::event::{KeyboardInput, VirtualKeyCode, WindowEvent};
 
 
 /// Every event receiver has to return a response for each event received.
@@ -17,11 +16,11 @@ pub enum EventResponse {
 
 /// Ability to handle and react to to certain input events.
 pub trait EventHandler {
-    fn handle_event(&mut self, e: &Event) -> EventResponse;
+    fn handle_event(&mut self, e: &WindowEvent) -> EventResponse;
 }
 
-impl<F: FnMut(&Event) -> EventResponse> EventHandler for F {
-    fn handle_event(&mut self, e: &Event) -> EventResponse {
+impl<F: FnMut(&WindowEvent) -> EventResponse> EventHandler for F {
+    fn handle_event(&mut self, e: &WindowEvent) -> EventResponse {
         self(e)
     }
 }
@@ -30,39 +29,44 @@ impl<F: FnMut(&Event) -> EventResponse> EventHandler for F {
 pub struct QuitHandler;
 
 impl EventHandler for QuitHandler {
-    fn handle_event(&mut self, e: &Event) -> EventResponse {
-        use glium::glutin::VirtualKeyCode;
+    fn handle_event(&mut self, e: &WindowEvent) -> EventResponse {
+        let should_quit = matches!(e,
+            WindowEvent::CloseRequested
+                | WindowEvent::Destroyed
+                | WindowEvent::KeyboardInput { input: KeyboardInput {
+                virtual_keycode: Some(VirtualKeyCode::Escape),
+                ..
+            }, ..}
+        );
 
-        match *e {
-            Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) |
-                Event::Closed => EventResponse::Quit,
-            _ => EventResponse::NotHandled,
+        if should_quit {
+            EventResponse::Quit
+        } else {
+            EventResponse::NotHandled
         }
     }
 }
 
 // Given a list of event handlers, pull new events from the window and let
 // the handlers handle those events.
-pub fn poll_events_with(
-    facade: &GlutinFacade,
+pub(crate) fn handle_with(
+    event: &WindowEvent,
     handlers: &mut [&mut dyn EventHandler]
 ) -> EventResponse {
     // We need to check if we handled at least one event
     let mut handled_at_least_one = false;
 
-    for ev in facade.poll_events() {
-        for handler in handlers.iter_mut() {
-            let response = handler.handle_event(&ev);
+    for handler in handlers.iter_mut() {
+        let response = handler.handle_event(&event);
 
-            if response != EventResponse::NotHandled {
-                handled_at_least_one = true;
-            }
+        if response != EventResponse::NotHandled {
+            handled_at_least_one = true;
+        }
 
-            match response {
-                EventResponse::NotHandled | EventResponse::Continue => (),
-                EventResponse::Break => break,
-                EventResponse::Quit => return EventResponse::Quit,
-            }
+        match response {
+            EventResponse::NotHandled | EventResponse::Continue => (),
+            EventResponse::Break => break,
+            EventResponse::Quit => return EventResponse::Quit,
         }
     }
 
