@@ -1,10 +1,15 @@
-use glium::backend::glutin_backend::GlutinFacade;
-use glium::glutin::{CursorState, Event};
+use std::rc::Rc;
 
-use camera::{Camera, Projection};
-use math::*;
-use shape::Shape;
-use event::{EventHandler, EventResponse};
+use cgmath::{prelude::*, Rad, Vector3};
+use winit::{event::{DeviceEvent, Event, KeyboardInput, WindowEvent}, window::Window};
+
+use crate::{
+    prelude::*,
+    camera::{Camera, Projection},
+    math::lerp,
+    shape::Shape,
+    event::{EventHandler, EventResponse},
+};
 use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which the camera can fly
@@ -27,7 +32,7 @@ const TURN_PER_PIXEL: Rad<f32> = Rad(0.00025);
 pub struct Fly {
     cam: Camera,
 
-    facade: GlutinFacade,
+    window: Rc<Window>,
 
     forward_speed: f32,
     forward_accel: f32,
@@ -40,14 +45,10 @@ pub struct Fly {
 
 impl Fly {
     /// Creates a new free-fly control. The facade mustn't be headless!
-    pub fn new(cam: Camera, facade: &GlutinFacade) -> Self {
-        assert!(facade.get_window().is_some());
-
+    pub fn new(cam: Camera, window: Rc<Window>) -> Self {
         Fly {
-            cam: cam,
-
-            facade: facade.clone(),
-
+            cam,
+            window,
             forward_speed: 0.0,
             forward_accel: 0.0,
             left_speed: 0.0,
@@ -56,17 +57,6 @@ impl Fly {
             up_accel: 0.0,
             faster: false,
         }
-    }
-
-    fn set_cursor_to_center(&mut self) {
-        self.facade
-            .get_window()
-            .and_then(|win| {
-                win.get_inner_size_pixels().and_then(|(w, h)| {
-                    win.set_cursor_position((w / 2) as i32, (h / 2) as i32).ok()
-                })
-            })
-            .expect("lost window");
     }
 }
 
@@ -98,11 +88,8 @@ impl CamControl for Fly {
             1.0
         };
 
-        let distance_multiplier = clamp(
-            2.0 * shape.min_distance_from(self.cam.position).abs(),
-            0.0005,
-            2.0
-        );
+        let distance_multiplier = (2.0 * shape.min_distance_from(self.cam.position).abs())
+            .clamp(0.0005, 2.0);
 
         let up_vec = Vector3::new(0.0, 0.0, 1.0);
         let left_vec = -self.cam.direction().cross(up_vec).normalize();
@@ -123,29 +110,37 @@ impl CamControl for Fly {
     }
 
     fn on_control_gain(&mut self) {
-        self.facade
-            .get_window()
-            .unwrap()
-            .set_cursor_state(CursorState::Hide)
-            .expect("failed to set cursor state");
-        self.set_cursor_to_center();
+        self.window.set_cursor_visible(false);
+        if let Err(e) = self.window.set_cursor_grab(true) {
+            // TODO: maybe propagate up?
+            error!("set_cursor_grab(true) errored: {}", e);
+        }
     }
 
     fn on_control_loss(&mut self) {
-        self.facade
-            .get_window()
-            .unwrap()
-            .set_cursor_state(CursorState::Normal)
-            .expect("failed to set cursor state");
+        self.window.set_cursor_visible(true);
+        if let Err(e) = self.window.set_cursor_grab(false) {
+            // TODO: maybe propagate up?
+            error!("set_cursor_grab(false) errored: {}", e);
+        }
     }
 }
 
 impl EventHandler for Fly {
-    fn handle_event(&mut self, e: &Event) -> EventResponse {
-        match *e {
-            Event::KeyboardInput(state, _, Some(key)) => {
-                use glium::glutin::ElementState::*;
-                use glium::glutin::VirtualKeyCode as Vkc;
+    fn handle_event(&mut self, e: &Event<()>) -> EventResponse {
+        match e {
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput {
+                        state,
+                        virtual_keycode: Some(key),
+                        ..
+                    },
+                    ..
+                },
+                ..
+            } => {
+                use winit::event::{ElementState::*, VirtualKeyCode as Vkc};
 
                 match (state, key) {
                     // Update accelerations
@@ -172,23 +167,15 @@ impl EventHandler for Fly {
 
                 EventResponse::Break
             }
-            Event::MouseMoved(x, y) => {
-                // We reset the cursor to the center each time, so we have to
-                // calculate the delta from the center
-                let (w, h) = self.facade
-                    .get_window()
-                    .and_then(|w| w.get_inner_size_pixels())
-                    .expect("lost window");
-                let (x_center, y_center) = (w / 2, h / 2);
-                let (x_diff, y_diff) = (x - (x_center as i32), y - (y_center as i32));
-
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta: (x, y) },
+                ..
+            } => {
                 let (mut theta, mut phi) = self.cam.spherical_coords();
-                theta += TURN_PER_PIXEL * (y_diff as f32);
-                phi += TURN_PER_PIXEL * 2.0 * (-x_diff as f32);
+                theta += TURN_PER_PIXEL * *y as f32;
+                phi += TURN_PER_PIXEL * 2.0 * *x as f32;
 
                 self.cam.look_at_sphere(theta, phi);
-
-                self.set_cursor_to_center();
 
                 EventResponse::Break
             }

@@ -1,9 +1,12 @@
-use glium::glutin::Event;
+use cgmath::{prelude::*, Point3, Rad, Vector3};
+use winit::event::{Event, KeyboardInput, WindowEvent};
 
-use camera::{Camera, Projection};
-use math::*;
-use shape::Shape;
-use event::{EventHandler, EventResponse};
+use crate::{
+    camera::{Camera, Projection},
+    math::lerp,
+    shape::Shape,
+    event::{EventHandler, EventResponse},
+};
 use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which theta can change.
@@ -48,7 +51,7 @@ impl Orbit {
         let distance = 3.0;
 
         Orbit {
-            origin: origin,
+            origin,
             cam: Camera::new(origin + -(init_dir * distance), init_dir, proj),
             theta_speed: Rad(0.0),
             theta_accel: Rad(0.0),
@@ -116,12 +119,21 @@ impl CamControl for Orbit {
 }
 
 impl EventHandler for Orbit {
-    fn handle_event(&mut self, e: &Event) -> EventResponse {
-        // We are only interested in keyboard input ...
-        if let Event::KeyboardInput(state, _, Some(key)) = *e {
-            use glium::glutin::ElementState::*;
-            use glium::glutin::VirtualKeyCode as Vkc;
+    fn handle_event(&mut self, e: &Event<()>) -> EventResponse {
+        use winit::event::{ElementState::*, VirtualKeyCode as Vkc};
 
+        // We are only interested in keyboard input ...
+        if let Event::WindowEvent {
+            event: WindowEvent::KeyboardInput {
+                input: KeyboardInput {
+                    state,
+                    virtual_keycode: Some(key),
+                    ..
+                },
+                ..
+            },
+            ..
+        } = e {
             match (state, key) {
                 // Update accelerations for turning
                 (Pressed,  Vkc::Up) | (Released, Vkc::Down) if self.theta_accel <= Rad(0.0)
@@ -134,11 +146,15 @@ impl EventHandler for Orbit {
                     => self.phi_accel -= Rad(1.0),
 
                 // Update zoom speed
-                (Released, Vkc::Add) | (Pressed, Vkc::Subtract) |
-                (Released, Vkc::Equals) | (Pressed, Vkc::Minus) if self.zoom_speed <= 0.0
+                (Released, Vkc::Plus)
+                | (Released, Vkc::NumpadAdd)
+                | (Pressed, Vkc::NumpadSubtract)
+                | (Pressed, Vkc::Minus) if self.zoom_speed <= 0.0
                     => self.zoom_speed += ZOOM_SPEED,
-                (Pressed, Vkc::Add) | (Released, Vkc::Subtract) |
-                (Pressed, Vkc::Equals) | (Released, Vkc::Minus) if self.zoom_speed >= 0.0
+                (Pressed, Vkc::Plus)
+                | (Pressed, Vkc::NumpadAdd)
+                | (Released, Vkc::NumpadSubtract)
+                | (Released, Vkc::Minus) if self.zoom_speed >= 0.0
                     => self.zoom_speed -= ZOOM_SPEED,
 
                 _ => return EventResponse::NotHandled,

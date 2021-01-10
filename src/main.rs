@@ -1,9 +1,10 @@
 #![feature(array_value_iter, array_map, const_in_array_repeat_expressions)]
+#![feature(or_patterns)]
 
 mod app;
 mod prelude;
 mod camera;
-// mod control;
+mod control;
 // mod env;
 mod event;
 mod math;

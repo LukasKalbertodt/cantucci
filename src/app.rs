@@ -12,10 +12,22 @@
 // use event::{EventResponse, poll_events_with, QuitHandler};
 // use mesh::ShapeMesh;
 
-use winit::{dpi::PhysicalSize, event::{Event, WindowEvent}, event_loop::{ControlFlow, EventLoop}, window::Window};
+use std::rc::Rc;
 
-use crate::{event::{EventHandler, EventResponse, QuitHandler}, prelude::*};
+use cgmath::{Point3, Rad};
+use winit::{
+    dpi::PhysicalSize,
+    event::{Event, VirtualKeyCode, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::Window,
+};
 
+use crate::{
+    camera::Projection,
+    control::{CamControl, Fly as FlyControl, KeySwitcher, Orbit as OrbitControl},
+    event::{EventHandler, EventResponse, QuitHandler},
+    prelude::*,
+};
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
@@ -28,33 +40,45 @@ pub(crate) async fn run() -> Result<()> {
     // TODO: maybe chose initial dimension of the window
     debug!("Created window");
 
-    let mut app = App::new(&window).await?;
+    let mut app = App::new(Rc::new(window)).await?;
 
     info!("Initialized app");
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::RedrawRequested(_) => app.draw(),
             Event::LoopDestroyed => info!("Bye :-)"),
-            Event::WindowEvent { event, .. } => {
+
+            // Explicitly list all the events we don't handle (currently)
+            Event::NewEvents(_)
+            | Event::UserEvent(_)
+            | Event::Suspended
+            | Event::Resumed
+            | Event::MainEventsCleared
+            | Event::RedrawEventsCleared => {}
+
+            // Forward window and device events to handlers.
+            event => {
                 let resp = app.handle_event(&event);
                 if resp == EventResponse::Quit {
                     *control_flow = ControlFlow::Exit;
                 }
             }
-            _ => {}
         }
     });
 }
 
 struct App {
+    window: Rc<Window>,
     device: wgpu::Device,
     surface: wgpu::Surface,
     swap_chain: wgpu::SwapChain,
     queue: wgpu::Queue,
+
+    control: KeySwitcher<OrbitControl, FlyControl>,
 }
 
 impl App {
-    async fn new(window: &Window) -> Result<Self> {
+    async fn new(window: Rc<Window>) -> Result<Self> {
         info!("Initializing wgpu...");
 
         // Create an instance, just a temporary object to get access to other
@@ -62,12 +86,11 @@ impl App {
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         debug!("Created wgpu instance");
 
-
         // Create the surface, something we can draw on (or well, we will create
         // a swapchain from). The surface call is `unsafe` because we must
         // ensure `window` is a valid raw window handle to create a surface on.
         // Let's just assume it is.
-        let surface = unsafe { instance.create_surface(window) };
+        let surface = unsafe { instance.create_surface(&*window) };
         debug!("Created wgpu surface");
 
         // The adapter is a physical device. The variable is only temporary and
@@ -83,7 +106,6 @@ impl App {
         debug!("Created wgpu adapter: {:#?}", adapter.get_info());
         trace!("Adapter features: {:#?}", adapter.features());
         trace!("Adapter limits: {:#?}", adapter.limits());
-
 
         let (device, queue) = adapter
             .request_device(
@@ -106,11 +128,22 @@ impl App {
         debug!("Created swapchain with dimensions {}x{}", desc.width, desc.height);
 
         info!("Finished wgpu intialization");
+
+        // Initialize our projection parameters.
+        let proj = Projection::new(Rad(1.0), 0.000_04..10.0, window.inner_size().into());
+
+        let orbit = OrbitControl::around(Point3::new(0.0, 0.0, 0.0), proj);
+        let fly = FlyControl::new(orbit.camera().clone(), window.clone());
+        let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
+
         Ok(Self {
+            window,
             device,
             surface,
             swap_chain,
             queue,
+
+            control: switcher,
         })
     }
 
@@ -119,21 +152,22 @@ impl App {
         self.swap_chain = self.device.create_swap_chain(&self.surface, &desc);
     }
 
-    fn draw(&self) {
-
-    }
+    fn draw(&self) {}
 }
 
 impl EventHandler for App {
-    fn handle_event(&mut self, e: &WindowEvent) -> EventResponse {
-        if let WindowEvent::Resized(new_size) = e {
+    fn handle_event(&mut self, e: &Event<()>) -> EventResponse {
+        if let Event::WindowEvent {
+            event: WindowEvent::Resized(new_size),
+            ..
+        } = e
+        {
             self.recreate_swap_chain(*new_size);
+            debug!("Window dimension changed to {:?}", new_size);
             return EventResponse::Break;
         }
 
-        crate::event::handle_with(e, &mut [
-            &mut QuitHandler
-        ])
+        crate::event::handle_with(e, &mut [&mut QuitHandler, &mut self.control])
     }
 }
 
@@ -147,10 +181,8 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
     }
 }
 
-
 // pub struct App {
 //     facade: GlutinFacade,
-//     control: Box<dyn CamControl>,
 //     mesh: ShapeMesh,
 //     env: Environment,
 //     print_fps: bool,
@@ -159,8 +191,6 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
 // impl App {
 //     /// Creates all needed resources, including the OpenGL context.
 //     pub fn init() -> Result<Self> {
-//         use glium::glutin::VirtualKeyCode;
-
 //         // Create OpenGL context
 //         let facade = create_context()
 //             .chain_err(|| "failed to create GL context")?;
@@ -171,16 +201,6 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
 //             Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<dyn Shape>
 //         };
 //         let mesh = ShapeMesh::new(&facade, shape)?;
-
-//         let proj = Projection::new(
-//             Rad(1.0),
-//             0.000_04 .. 10.0,
-//             facade.get_framebuffer_dimensions(),
-//         );
-
-//         let orbit = OrbitControl::around(Point3::new(0.0, 0.0, 0.0), proj);
-//         let fly = FlyControl::new(orbit.camera().clone(), &facade);
-//         let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
 
 //         let env = Environment::new(&facade)?;
 
@@ -228,7 +248,6 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
 //             self.mesh.draw(&mut target, &self.control.camera(), &self.env)?;
 
 //             target.finish().unwrap();
-
 
 //             // Poll window events
 //             let res = self.poll_events();
@@ -292,15 +311,9 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
 //             },
 //         ]);
 
-//         if let Some((w, h)) = new_res {
-//             self.control.projection_mut().set_aspect_ratio(w, h);
-//             trace!("resolution changed to {}x{}px", w, h);
-//         }
-
 //         out
 //     }
 // }
-
 
 // /// Creates the OpenGL context and logs useful information about the
 // /// success or failure of said action.
@@ -311,12 +324,6 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
 //     // Check resolution of monitor
 //     let monitor = get_primary_monitor();
 //     let (monitor_width, monitor_height) = monitor.get_dimensions();
-//     info!(
-//         "Primary monitor: '{}' ({}x{}px)",
-//         monitor.get_name().unwrap_or("???".into()),
-//         monitor_width,
-//         monitor_height,
-//     );
 
 //     // Create glium context
 //     let context = glutin::WindowBuilder::new()
@@ -327,32 +334,6 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
 
 //     // Print some information about the acquired OpenGL context
 //     info!("OpenGL context was successfully built");
-
-//     let glium::Version(api, major, minor) = *context.get_opengl_version();
-//     info!(
-//         "Version of context: {} {}.{}",
-//         if api == glium::Api::Gl { "OpenGL" } else { "OpenGL ES" },
-//         major,
-//         minor
-//     );
-
-//     let glium::Version(api, major, minor) = context.get_supported_glsl_version();
-//     info!(
-//         "Supported GLSL version: {} {}.{}",
-//         if api == glium::Api::Gl { "GLSL" } else { "GLSL ES" },
-//         major,
-//         minor
-//     );
-
-//     if let Some(mem) = context.get_free_video_memory().map(|mem| mem as u64) {
-//         let (mem, unit) = match () {
-//             _ if mem < (1 << 12) => (mem, "B"),
-//             _ if mem < (1 << 22) => (mem >> 10, "KB"),
-//             _ if mem < (1 << 32) => (mem >> 20, "MB"),
-//             _ => (mem >> 30, "GB"),
-//         };
-//         info!("Free GPU memory (estimated): {}{}", mem, unit);
-//     }
 
 //     Ok(context)
 // }

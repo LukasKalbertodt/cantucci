@@ -1,4 +1,4 @@
-use winit::event::{KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 
 /// Every event receiver has to return a response for each event received.
@@ -16,11 +16,11 @@ pub enum EventResponse {
 
 /// Ability to handle and react to to certain input events.
 pub trait EventHandler {
-    fn handle_event(&mut self, e: &WindowEvent) -> EventResponse;
+    fn handle_event(&mut self, e: &Event<()>) -> EventResponse;
 }
 
-impl<F: FnMut(&WindowEvent) -> EventResponse> EventHandler for F {
-    fn handle_event(&mut self, e: &WindowEvent) -> EventResponse {
+impl<F: FnMut(&Event<()>) -> EventResponse> EventHandler for F {
+    fn handle_event(&mut self, e: &Event<()>) -> EventResponse {
         self(e)
     }
 }
@@ -29,20 +29,22 @@ impl<F: FnMut(&WindowEvent) -> EventResponse> EventHandler for F {
 pub struct QuitHandler;
 
 impl EventHandler for QuitHandler {
-    fn handle_event(&mut self, e: &WindowEvent) -> EventResponse {
-        let should_quit = matches!(e,
-            WindowEvent::CloseRequested
-                | WindowEvent::Destroyed
-                | WindowEvent::KeyboardInput { input: KeyboardInput {
-                virtual_keycode: Some(VirtualKeyCode::Escape),
+    fn handle_event(&mut self, e: &Event<()>) -> EventResponse {
+        match e {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested
+                    | WindowEvent::Destroyed
+                    | WindowEvent::KeyboardInput {
+                        input: KeyboardInput {
+                            virtual_keycode: Some(VirtualKeyCode::Escape),
+                            ..
+                        },
+                        ..
+                    }
+                ,
                 ..
-            }, ..}
-        );
-
-        if should_quit {
-            EventResponse::Quit
-        } else {
-            EventResponse::NotHandled
+            } => EventResponse::Quit,
+            _ => EventResponse::NotHandled,
         }
     }
 }
@@ -50,7 +52,7 @@ impl EventHandler for QuitHandler {
 // Given a list of event handlers, pull new events from the window and let
 // the handlers handle those events.
 pub(crate) fn handle_with(
-    event: &WindowEvent,
+    event: &Event<()>,
     handlers: &mut [&mut dyn EventHandler]
 ) -> EventResponse {
     // We need to check if we handled at least one event
