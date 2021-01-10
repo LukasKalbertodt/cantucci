@@ -6,7 +6,7 @@ mod camera;
 // mod control;
 // mod env;
 mod event;
-// mod math;
+mod math;
 // mod mesh;
 // mod octree;
 mod shape;
