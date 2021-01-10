@@ -1,6 +1,5 @@
 use std::ops::Range;
-
-use math::*;
+use cgmath::Point3;
 
 #[macro_use]
 mod util;

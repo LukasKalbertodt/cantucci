@@ -1,10 +1,12 @@
 use glium::glutin::Event;
 use glium::glutin::VirtualKeyCode;
 
-use camera::{Camera, Projection};
-use math::*;
-use shape::Shape;
-use event::{EventHandler, EventResponse};
+use crate::{
+    camera::{Camera, Projection},
+    math::*,
+    shape::Shape,
+    event::{EventHandler, EventResponse},
+};
 
 mod fly;
 mod orbit;

@@ -9,7 +9,7 @@ mod event;
 // mod math;
 // mod mesh;
 // mod octree;
-// mod shape;
+mod shape;
 // mod util;
 
 

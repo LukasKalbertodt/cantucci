@@ -1,6 +1,6 @@
 use std::ops::Range;
+use cgmath::{prelude::*, Point3, Vector3};
 
-use math::*;
 use super::Shape;
 
 #[derive(Clone)]
@@ -12,8 +12,8 @@ pub struct Sphere {
 impl Sphere {
     pub fn new(center: Point3<f32>, radius: f32) -> Self {
         Sphere {
-            center: center,
-            radius: radius,
+            center,
+            radius,
         }
     }
 }
