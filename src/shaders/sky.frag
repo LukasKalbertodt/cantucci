@@ -1,14 +1,14 @@
-#version 140
+#version 450
 
-in vec3 world_pos;
+layout(location = 0) in vec3 i_pos;
 
-out vec3 color;
+layout(location = 0) out vec3 color;
 
 #define PI 3.1415926
 
 void main() {
     // Calculate spherical coordinates
-    vec3 unit = normalize(world_pos);
+    vec3 unit = normalize(i_pos);
     float theta = acos(unit.z);         // z in [-1...1] => theta in [PI..0]
     float thn = theta / PI;             // normalize to [1..0]
     float phi = atan(unit.y, unit.x);   // Phi is in [0..2PI]
