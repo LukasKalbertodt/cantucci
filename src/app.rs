@@ -189,7 +189,7 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
         format: wgpu::TextureFormat::Bgra8UnormSrgb,
         width: size.width,
         height: size.height,
-        present_mode: wgpu::PresentMode::Mailbox,
+        present_mode: wgpu::PresentMode::Fifo,
     }
 }
 
