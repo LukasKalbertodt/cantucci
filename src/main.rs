@@ -1,6 +1,8 @@
 #![feature(array_value_iter, array_map, const_in_array_repeat_expressions)]
 #![feature(or_patterns)]
 
+#![allow(dead_code)] // TODO
+
 mod app;
 mod prelude;
 mod camera;
@@ -11,7 +13,7 @@ mod math;
 // mod mesh;
 // mod octree;
 mod shape;
-// mod util;
+mod util;
 
 
 fn main() {

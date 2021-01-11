@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-use util::iter;
+use super::iter;
 
 /// A lookup table for regular 3D grids. Every cell in the grid contains one
 /// value.
@@ -30,10 +30,7 @@ impl<T> GridTable<T> {
             data.push(filler(x, y, z));
         }
 
-        GridTable {
-            size: size,
-            data: data,
-        }
+        GridTable { size, data }
     }
 }
 
