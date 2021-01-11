@@ -14,9 +14,9 @@
 
 use std::{
     rc::Rc,
+    sync::Arc,
     time::{Duration, Instant},
 };
-
 
 use cgmath::{Point3, Rad};
 use winit::{
@@ -31,8 +31,10 @@ use crate::{
     control::{CamControl, Fly as FlyControl, KeySwitcher, Orbit as OrbitControl},
     event::{EventHandler, EventResponse, QuitHandler},
     prelude::*,
+    shape::{Mandelbulb, Shape},
     sky::Sky,
 };
+
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
 
@@ -50,6 +52,7 @@ pub(crate) async fn run() -> Result<()> {
     info!("Initialized app");
     event_loop.run(move |event, _, control_flow| {
         match event {
+            Event::MainEventsCleared => app.update(),
             Event::RedrawRequested(_) => {
                 if let Err(e) = app.draw() {
                     eprintln!("{:?}", e);
@@ -63,7 +66,6 @@ pub(crate) async fn run() -> Result<()> {
             | Event::UserEvent(_)
             | Event::Suspended
             | Event::Resumed
-            | Event::MainEventsCleared
             | Event::RedrawEventsCleared => {}
 
             // Forward window and device events to handlers.
@@ -86,7 +88,9 @@ struct App {
 
     control: KeySwitcher<OrbitControl, FlyControl>,
     fps_timer: FpsTimer,
+    last_update: Instant,
     sky: Sky,
+    shape: Arc<dyn Shape>,
 }
 
 impl App {
@@ -149,6 +153,7 @@ impl App {
         let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
 
         let sky = Sky::new(&device, desc.format)?;
+        let shape = Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<dyn Shape>;
 
         Ok(Self {
             window,
@@ -159,13 +164,23 @@ impl App {
 
             control: switcher,
             fps_timer: FpsTimer::new(),
+            last_update: Instant::now(),
             sky,
+            shape,
         })
     }
 
     fn recreate_swap_chain(&mut self, new_size: PhysicalSize<u32>) {
         let desc = swap_chain_description(new_size);
         self.swap_chain = self.device.create_swap_chain(&self.surface, &desc);
+    }
+
+    fn update(&mut self) {
+        let now = Instant::now();
+        let delta = now - self.last_update;
+        self.last_update = now;
+
+        self.control.update(delta.as_secs_f32(), &*self.shape);
     }
 
     fn draw(&mut self) -> Result<()> {
