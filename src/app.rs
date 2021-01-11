@@ -31,6 +31,7 @@ use crate::{
     control::{CamControl, Fly as FlyControl, KeySwitcher, Orbit as OrbitControl},
     event::{EventHandler, EventResponse, QuitHandler},
     prelude::*,
+    sky::Sky,
 };
 
 const WINDOW_TITLE: &'static str = "Cantucci ◕ ◡ ◕";
@@ -49,7 +50,12 @@ pub(crate) async fn run() -> Result<()> {
     info!("Initialized app");
     event_loop.run(move |event, _, control_flow| {
         match event {
-            Event::RedrawRequested(_) => app.draw(),
+            Event::RedrawRequested(_) => {
+                if let Err(e) = app.draw() {
+                    eprintln!("{:?}", e);
+                    *control_flow = ControlFlow::Exit;
+                }
+            }
             Event::LoopDestroyed => info!("Bye :-)"),
 
             // Explicitly list all the events we don't handle (currently)
@@ -80,6 +86,7 @@ struct App {
 
     control: KeySwitcher<OrbitControl, FlyControl>,
     fps_timer: FpsTimer,
+    sky: Sky,
 }
 
 impl App {
@@ -141,6 +148,8 @@ impl App {
         let fly = FlyControl::new(orbit.camera().clone(), window.clone());
         let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
 
+        let sky = Sky::new(&device, desc.format)?;
+
         Ok(Self {
             window,
             device,
@@ -150,6 +159,7 @@ impl App {
 
             control: switcher,
             fps_timer: FpsTimer::new(),
+            sky,
         })
     }
 
@@ -158,12 +168,22 @@ impl App {
         self.swap_chain = self.device.create_swap_chain(&self.surface, &desc);
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self) -> Result<()> {
         self.fps_timer.register_frame();
         if let Some(fps) = self.fps_timer.report_fps() {
             self.window.set_title(&format!("{} ({:.1} fps)", WINDOW_TITLE, fps))
         }
+
+        let frame = self.swap_chain
+            .get_current_frame()
+            .context("Failed to acquire next swap chain texture")?
+            .output;
+
+        self.sky.dome().draw(&frame, &self.device, &self.queue);
+
+
         self.window.request_redraw();
+        Ok(())
     }
 }
 

@@ -27,3 +27,9 @@ macro_rules! to_arr_impl_gen_into_type {
 to_arr_impl_gen_into_type!(Matrix4, [[T; 4]; 4]);
 to_arr_impl_gen_into_type!(Point3, [T; 3]);
 to_arr_impl_gen_into_type!(Vector3, [T; 3]);
+
+macro_rules! include_shader {
+    ($name:literal) => {
+        wgpu::include_spirv!(concat!(env!("OUT_DIR"), "/shaders/", $name, ".spirv"))
+    };
+}

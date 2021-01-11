@@ -3,17 +3,17 @@
 
 #![allow(dead_code)] // TODO
 
+#[macro_use] mod util;
 mod app;
 mod prelude;
 mod camera;
 mod control;
-// mod env;
 mod event;
 mod math;
 // mod mesh;
 // mod octree;
 mod shape;
-mod util;
+mod sky;
 
 
 fn main() {
