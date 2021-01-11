@@ -126,8 +126,11 @@ impl App {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
+                    features: wgpu::Features::PUSH_CONSTANTS,
+                    limits: wgpu::Limits {
+                        max_push_constant_size: adapter.limits().max_push_constant_size,
+                        .. wgpu::Limits::default()
+                    },
                     shader_validation: true,
                 },
                 None,
@@ -194,7 +197,7 @@ impl App {
             .context("Failed to acquire next swap chain texture")?
             .output;
 
-        self.sky.dome().draw(&frame, &self.device, &self.queue);
+        self.sky.dome().draw(&frame, &self.device, &self.queue, &self.control.camera());
 
 
         self.window.request_redraw();

@@ -1,8 +1,9 @@
 use std::mem;
 
+use cgmath::{Matrix4, Vector4};
 use wgpu::util::DeviceExt;
 
-use crate::prelude::*;
+use crate::{camera::Camera, prelude::*, util::ToArr};
 use super::SKY_DISTANCE;
 
 
@@ -24,7 +25,7 @@ impl Dome {
         });
 
         let ibuf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
+            label: Some("Dome index Buffer"),
             contents: bytemuck::cast_slice(&INDICES),
             usage: wgpu::BufferUsage::INDEX,
         });
@@ -35,7 +36,10 @@ impl Dome {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[],
-            push_constant_ranges: &[],
+            push_constant_ranges: &[wgpu::PushConstantRange {
+                stages: wgpu::ShaderStage::VERTEX,
+                range: 0..mem::size_of::<Matrix4<f32>>() as u32,
+            }],
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Dome render pipeline"),
@@ -49,8 +53,7 @@ impl Dome {
                 entry_point: "main",
             }),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::Back,
+                cull_mode: wgpu::CullMode::None,
                 ..Default::default()
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
@@ -93,11 +96,13 @@ impl Dome {
         frame: &wgpu::SwapChainTexture,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        camera: &Camera,
     ) {
-        // // We discard the translation transformation from the view matrix. This
-        // // results in a "fixed" sky that moves with the camera.
-        // let mut view_transform = camera.view_transform();
-        // view_transform.w = Vector4::new(0.0, 0.0, 0.0, view_transform.w.w);
+        // We discard the translation transformation from the view matrix. This
+        // results in a "fixed" sky that moves with the camera.
+        let mut view_transform = camera.view_transform();
+        view_transform.w = Vector4::new(0.0, 0.0, 0.0, view_transform.w.w);
+        let transform_mat = camera.proj_transform() * view_transform;
 
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -107,23 +112,24 @@ impl Dome {
                     attachment: &frame.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
+                        load: wgpu::LoadOp::Load,
                         store: true,
                     },
                 }],
                 depth_stencil_attachment: None,
             });
+
             rpass.push_debug_group("Prepare data for draw.");
             rpass.set_pipeline(&self.pipeline);
-            // rpass.set_bind_group(0, &self.bind_group, &[]);
             rpass.set_index_buffer(self.ibuf.slice(..));
             rpass.set_vertex_buffer(0, self.vbuf.slice(..));
+            rpass.set_push_constants(
+                wgpu::ShaderStage::VERTEX,
+                0,
+                bytemuck::cast_slice(&transform_mat.to_arr()),
+            );
             rpass.pop_debug_group();
+
             rpass.insert_debug_marker("Draw!");
             rpass.draw_indexed(0..INDICES.len() as u32, 0, 0..1);
         }

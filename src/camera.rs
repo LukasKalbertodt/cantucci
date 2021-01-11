@@ -1,4 +1,3 @@
-#![allow(dead_code)] // TODO
 
 use std::ops::Range;
 use cgmath::{Matrix4, Point3, Rad, Vector3, prelude::*};
