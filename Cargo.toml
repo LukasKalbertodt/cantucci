@@ -7,10 +7,6 @@ authors = [
 ]
 edition = "2018"
 
-[profile.dev]
-opt-level = 1
-codegen-units = 4
-
 [dependencies]
 anyhow = "1"
 bytemuck = "1"
