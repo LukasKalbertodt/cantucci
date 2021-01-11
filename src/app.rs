@@ -12,7 +12,11 @@
 // use event::{EventResponse, poll_events_with, QuitHandler};
 // use mesh::ShapeMesh;
 
-use std::rc::Rc;
+use std::{
+    rc::Rc,
+    time::{Duration, Instant},
+};
+
 
 use cgmath::{Point3, Rad};
 use winit::{
@@ -75,6 +79,7 @@ struct App {
     queue: wgpu::Queue,
 
     control: KeySwitcher<OrbitControl, FlyControl>,
+    fps_timer: FpsTimer,
 }
 
 impl App {
@@ -144,6 +149,7 @@ impl App {
             queue,
 
             control: switcher,
+            fps_timer: FpsTimer::new(),
         })
     }
 
@@ -152,7 +158,13 @@ impl App {
         self.swap_chain = self.device.create_swap_chain(&self.surface, &desc);
     }
 
-    fn draw(&self) {}
+    fn draw(&mut self) {
+        self.fps_timer.register_frame();
+        if let Some(fps) = self.fps_timer.report_fps() {
+            self.window.set_title(&format!("{} ({:.1} fps)", WINDOW_TITLE, fps))
+        }
+        self.window.request_redraw();
+    }
 }
 
 impl EventHandler for App {
@@ -180,6 +192,44 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
         present_mode: wgpu::PresentMode::Mailbox,
     }
 }
+
+
+/// How often the FPS are reported. Longer times lead to more delay and more
+/// smoothing.
+const REPORT_INTERVAL: Duration = Duration::from_millis(250);
+
+pub(crate) struct FpsTimer {
+    last_report: Instant,
+    frames_since_last_report: u32,
+}
+
+impl FpsTimer {
+    fn new() -> Self {
+        Self {
+            last_report: Instant::now(),
+            frames_since_last_report: 0,
+        }
+    }
+
+    fn register_frame(&mut self) {
+    self.frames_since_last_report += 1;
+}
+
+    /// Returns `Some(fps)` every `REPORT_INTERVAL`.
+    pub(crate) fn report_fps(&mut self) -> Option<f64> {
+        let elapsed = self.last_report.elapsed();
+        if elapsed >= REPORT_INTERVAL {
+            let fps = self.frames_since_last_report as f64 / elapsed.as_secs_f64();
+            self.last_report = Instant::now();
+            self.frames_since_last_report = 0;
+
+            Some(fps)
+        } else {
+            None
+        }
+    }
+}
+
 
 // pub struct App {
 //     facade: GlutinFacade,
