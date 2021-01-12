@@ -132,12 +132,20 @@ impl MeshBuffer {
             // First, check if the current cell is only partially inside the
             // shape (if the cell intersects the shape's surface). If that's
             // not the case, we won't generate a vertex for this cell.
-            let partially_in = !(
-                distances.iter().all(|&d| d < 0.0) ||
-                distances.iter().all(|&d| d > 0.0)
-            );
+            let no_shape_crossing = {
+                let first = distances[0].is_sign_positive();
+                let mut all_same = true;
+                for d in &distances[1..] {
+                    if d.is_sign_positive() != first {
+                        all_same = false;
+                        break;
+                    }
+                }
 
-            if !partially_in {
+                all_same
+            };
+
+            if no_shape_crossing {
                 // FIXME
                 // This is a bit hacky, but we will never access this number
                 return None;
