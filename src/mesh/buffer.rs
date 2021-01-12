@@ -150,7 +150,7 @@ impl MeshBuffer {
 
             // We want to iterate over all 12 edges of the cell. Here, we list
             // all edges by specifying their corner indices.
-            const EDGES: [(usize, usize); 12] = [
+            const EDGES: [(u8, u8); 12] = [
                 // Edges whose endpoints differ in the x coordinate (first
                 // corner id is -x, second is +x).
                 (0, 4),     //    -y -z
@@ -183,6 +183,7 @@ impl MeshBuffer {
             // already calculated distances. Improving this might be worth
             // experimenting (see #1).
             let edge_crossings = EDGES.iter().cloned()
+                .map(|(from, to)| (from as usize, to as usize))
 
                 // We are only interested in the edges with shape crossing. The
                 // edge crosses the shape iff the endpoints' estimated minimal
