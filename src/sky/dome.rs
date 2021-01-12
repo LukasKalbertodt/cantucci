@@ -3,7 +3,7 @@ use std::mem;
 use cgmath::{Matrix4, Vector4};
 use wgpu::util::DeviceExt;
 
-use crate::{camera::Camera, prelude::*, util::ToArr};
+use crate::{camera::Camera, prelude::*, util::ToArr, wgpu::DrawContext};
 use super::SKY_DISTANCE;
 
 
@@ -91,11 +91,9 @@ impl Dome {
     ///
     /// Currently, no depth test is active. Just draw the sky first, everything
     /// else will overdraw.
-    pub fn draw(
+    pub(crate) fn draw(
         &self,
-        frame: &wgpu::SwapChainTexture,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        draw_ctx: DrawContext<'_>,
         camera: &Camera,
     ) {
         // We discard the translation transformation from the view matrix. This
@@ -104,12 +102,14 @@ impl Dome {
         view_transform.w = Vector4::new(0.0, 0.0, 0.0, view_transform.w.w);
         let transform_mat = camera.proj_transform() * view_transform;
 
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder = draw_ctx.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: None }
+        );
+
         {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
+                    attachment: &draw_ctx.frame.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -134,7 +134,7 @@ impl Dome {
             rpass.draw_indexed(0..INDICES.len() as u32, 0, 0..1);
         }
 
-        queue.submit(Some(encoder.finish()));
+        draw_ctx.queue.submit(Some(encoder.finish()));
     }
 }
 

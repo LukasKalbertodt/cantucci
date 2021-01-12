@@ -101,3 +101,10 @@ fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor 
         present_mode: wgpu::PresentMode::Fifo,
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DrawContext<'a> {
+    pub(crate) frame: &'a wgpu::SwapChainTexture,
+    pub(crate) device: &'a wgpu::Device,
+    pub(crate) queue: &'a wgpu::Queue,
+}

@@ -10,6 +10,7 @@ use crate::{
     octree::{Octree, SpanExt},
     shape::Shape,
     util::iter,
+    wgpu::DrawContext,
 };
 
 mod buffer;
@@ -179,9 +180,7 @@ impl ShapeMesh {
     // Draws the whole shape by traversing the internal octree.
     pub(crate) fn draw(
         &self,
-        frame: &wgpu::SwapChainTexture,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        draw_ctx: DrawContext<'_>,
         camera: &Camera,
     ) {
         // Visit each node of the tree.
@@ -194,7 +193,7 @@ impl ShapeMesh {
                 // If there is a view available, render it.
                 &MeshStatus::Ready(ref view) |
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
-                    view.draw(frame, device, queue, camera, &self.pipeline);
+                    view.draw(draw_ctx, camera, &self.pipeline);
                 }
                 _ => (),
             }

@@ -6,6 +6,7 @@ use wgpu::util::DeviceExt;
 use crate::{
     camera::Camera,
     util::ToArr,
+    wgpu::DrawContext,
 };
 use super::Vertex;
 
@@ -39,22 +40,22 @@ impl MeshView {
         }
     }
 
-    pub fn draw(
+    pub(crate) fn draw(
         &self,
-        frame: &wgpu::SwapChainTexture,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        draw_ctx: DrawContext<'_>,
         camera: &Camera,
         pipeline: &wgpu::RenderPipeline,
     ) {
         let transform_mat = camera.proj_transform() * camera.view_transform();
 
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder = draw_ctx.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor { label: None }
+        );
+
         {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
+                    attachment: &draw_ctx.frame.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -79,7 +80,7 @@ impl MeshView {
             rpass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
 
-        queue.submit(Some(encoder.finish()));
+        draw_ctx.queue.submit(Some(encoder.finish()));
     }
 }
 

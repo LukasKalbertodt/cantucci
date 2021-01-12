@@ -30,7 +30,7 @@ use crate::{
     prelude::*,
     shape::{Mandelbulb, Shape},
     sky::Sky,
-    wgpu::Wgpu,
+    wgpu::{DrawContext, Wgpu},
 };
 
 
@@ -139,8 +139,14 @@ impl App {
             .context("Failed to acquire next swap chain texture")?
             .output;
 
-        self.sky.dome().draw(&frame, &self.wgpu.device, &self.wgpu.queue, &self.control.camera());
-        self.mesh.draw(&frame, &self.wgpu.device, &self.wgpu.queue, &self.control.camera());
+        let draw_ctx = DrawContext {
+            queue: &self.wgpu.queue,
+            device: &self.wgpu.device,
+            frame: &frame,
+        };
+
+        self.sky.dome().draw(draw_ctx, &self.control.camera());
+        self.mesh.draw(draw_ctx, &self.control.camera());
 
 
         self.window.request_redraw();
