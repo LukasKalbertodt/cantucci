@@ -1,6 +1,3 @@
-// use glium::backend::glutin_backend::GlutinFacade;
-// use std::sync::Arc;
-
 // use camera::Projection;
 // use control::Fly as FlyControl;
 // use control::Orbit as OrbitControl;
@@ -20,7 +17,6 @@ use std::{
 
 use cgmath::{Point3, Rad};
 use winit::{
-    dpi::PhysicalSize,
     event::{Event, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
@@ -33,6 +29,7 @@ use crate::{
     prelude::*,
     shape::{Mandelbulb, Shape},
     sky::Sky,
+    wgpu::Wgpu,
 };
 
 
@@ -47,7 +44,7 @@ pub(crate) async fn run() -> Result<()> {
     // TODO: maybe chose initial dimension of the window
     debug!("Created window");
 
-    let mut app = App::new(Rc::new(window)).await?;
+    let mut app = App::new(Rc::new(window)).await.context("failed to initialize `App`")?;
 
     info!("Initialized app");
     event_loop.run(move |event, _, control_flow| {
@@ -81,10 +78,7 @@ pub(crate) async fn run() -> Result<()> {
 
 struct App {
     window: Rc<Window>,
-    device: wgpu::Device,
-    surface: wgpu::Surface,
-    swap_chain: wgpu::SwapChain,
-    queue: wgpu::Queue,
+    wgpu: Wgpu,
 
     control: KeySwitcher<OrbitControl, FlyControl>,
     fps_timer: FpsTimer,
@@ -95,58 +89,7 @@ struct App {
 
 impl App {
     async fn new(window: Rc<Window>) -> Result<Self> {
-        info!("Initializing wgpu...");
-
-        // Create an instance, just a temporary object to get access to other
-        // objects.
-        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
-        debug!("Created wgpu instance");
-
-        // Create the surface, something we can draw on (or well, we will create
-        // a swapchain from). The surface call is `unsafe` because we must
-        // ensure `window` is a valid raw window handle to create a surface on.
-        // Let's just assume it is.
-        let surface = unsafe { instance.create_surface(&*window) };
-        debug!("Created wgpu surface");
-
-        // The adapter is a physical device. The variable is only temporary and
-        // only used to create a "logical device" (the `device`).
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: Some(&surface),
-            })
-            .await
-            .context("Failed to find an appropiate adapter")?;
-
-        debug!("Created wgpu adapter: {:#?}", adapter.get_info());
-        trace!("Adapter features: {:#?}", adapter.features());
-        trace!("Adapter limits: {:#?}", adapter.limits());
-
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::PUSH_CONSTANTS,
-                    limits: wgpu::Limits {
-                        max_push_constant_size: adapter.limits().max_push_constant_size,
-                        .. wgpu::Limits::default()
-                    },
-                    shader_validation: true,
-                },
-                None,
-            )
-            .await
-            .context("Failed to create device")?;
-
-        debug!("Created wgpu device (including a queue)");
-        trace!("Device features: {:#?}", device.features());
-        trace!("Device limits: {:#?}", device.limits());
-
-        let desc = swap_chain_description(window.inner_size());
-        let swap_chain = device.create_swap_chain(&surface, &desc);
-        debug!("Created swapchain with dimensions {}x{}", desc.width, desc.height);
-
-        info!("Finished wgpu intialization");
+        let wgpu = Wgpu::new(&window).await.context("failed to initialize wgpu")?;
 
         // Initialize our projection parameters.
         let proj = Projection::new(Rad(1.0), 0.000_04..10.0, window.inner_size().into());
@@ -155,15 +98,12 @@ impl App {
         let fly = FlyControl::new(orbit.camera().clone(), window.clone());
         let switcher = KeySwitcher::new(orbit, fly, VirtualKeyCode::F);
 
-        let sky = Sky::new(&device, desc.format)?;
+        let sky = Sky::new(&wgpu.device, wgpu.swap_chain_format)?;
         let shape = Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<dyn Shape>;
 
         Ok(Self {
             window,
-            device,
-            surface,
-            swap_chain,
-            queue,
+            wgpu,
 
             control: switcher,
             fps_timer: FpsTimer::new(),
@@ -171,11 +111,6 @@ impl App {
             sky,
             shape,
         })
-    }
-
-    fn recreate_swap_chain(&mut self, new_size: PhysicalSize<u32>) {
-        let desc = swap_chain_description(new_size);
-        self.swap_chain = self.device.create_swap_chain(&self.surface, &desc);
     }
 
     fn update(&mut self) {
@@ -192,12 +127,12 @@ impl App {
             self.window.set_title(&format!("{} ({:.1} fps)", WINDOW_TITLE, fps))
         }
 
-        let frame = self.swap_chain
+        let frame = self.wgpu.swap_chain
             .get_current_frame()
             .context("Failed to acquire next swap chain texture")?
             .output;
 
-        self.sky.dome().draw(&frame, &self.device, &self.queue, &self.control.camera());
+        self.sky.dome().draw(&frame, &self.wgpu.device, &self.wgpu.queue, &self.control.camera());
 
 
         self.window.request_redraw();
@@ -212,7 +147,7 @@ impl EventHandler for App {
             ..
         } = e
         {
-            self.recreate_swap_chain(*new_size);
+            self.wgpu.recreate_swap_chain(*new_size);
             debug!("Window dimension changed to {:?}", new_size);
             return EventResponse::Break;
         }
@@ -221,15 +156,6 @@ impl EventHandler for App {
     }
 }
 
-fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor {
-    wgpu::SwapChainDescriptor {
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        format: wgpu::TextureFormat::Bgra8UnormSrgb,
-        width: size.width,
-        height: size.height,
-        present_mode: wgpu::PresentMode::Fifo,
-    }
-}
 
 
 /// How often the FPS are reported. Longer times lead to more delay and more

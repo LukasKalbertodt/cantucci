@@ -14,6 +14,7 @@ mod math;
 mod octree;
 mod shape;
 mod sky;
+mod wgpu;
 
 
 fn main() {
@@ -25,6 +26,6 @@ fn main() {
 
     // Pretty print error chain
     if let Err(e) = res {
-        eprintln!("{:?}", e);
+        eprintln!("Cantucci error: {:?}", e);
     }
 }
