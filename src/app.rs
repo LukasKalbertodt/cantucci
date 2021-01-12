@@ -156,7 +156,8 @@ impl EventHandler for App {
         } = e
         {
             self.wgpu.recreate_swap_chain(*new_size);
-            debug!("Window dimension changed to {:?}", new_size);
+            self.control.projection_mut().set_aspect_ratio(new_size.width, new_size.height);
+            trace!("Window dimension changed to {:?}", new_size);
             return EventResponse::Break;
         }
 
