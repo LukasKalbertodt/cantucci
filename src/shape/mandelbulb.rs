@@ -7,29 +7,29 @@ use super::Shape;
 ///
 /// [1]: http://www.skytopia.com/project/fractal/mandelbulb.html
 #[derive(Clone)]
-pub struct Mandelbulb {
-    power: u8,
+pub struct Mandelbulb<const P: u8> {
     max_iters: u64,
     bailout: f32,
 }
 
 const CENTER: Point3<f32> = Point3 { x: 0.0, y: 0.0, z: 0.0 };
 
-impl Mandelbulb {
-    pub fn new(power: u8, max_iters: u64, bailout: f32) -> Self {
+impl<const P: u8> Mandelbulb<P> {
+    pub fn new(max_iters: u64, bailout: f32) -> Self {
         Mandelbulb {
-            power,
             max_iters,
             bailout,
         }
     }
+}
 
+impl Mandelbulb<8> {
     pub fn classic(max_iters: u64, bailout: f32) -> Self {
-        Self::new(8, max_iters, bailout)
+        Self::new(max_iters, bailout)
     }
 }
 
-impl Shape for Mandelbulb {
+impl<const P: u8> Shape for Mandelbulb<P> {
     fn contains(&self, p: Point3<f32>) -> bool {
         let mut z = p;
 
@@ -39,7 +39,7 @@ impl Shape for Mandelbulb {
                 return false;
             }
 
-            z = rotate(z, self.power) + (p - CENTER);
+            z = rotate::<P>(z) + (p - CENTER);
         }
 
         // The point didn't diverge within `max_iters`, so we assume it's in
@@ -64,8 +64,8 @@ impl Shape for Mandelbulb {
                 break;
             }
 
-            dr = r.powi(self.power as i32 - 1) * (self.power as f32) * dr + 1.0;
-            z = rotate(z, self.power) + (p - CENTER);
+            dr = r.powi(P as i32 - 1) * (P as f32) * dr + 1.0;
+            z = rotate::<P>(z) + (p - CENTER);
         }
 
         let ln_r = if r == 0.0 { 0.0 } else { r.ln() * r };
@@ -76,7 +76,7 @@ impl Shape for Mandelbulb {
         let s = include_str!("mandelbulb.frag")
             .replace("{BAILOUT}", &self.bailout.to_string())
             .replace("{MAX_ITERS}", &self.max_iters.to_string())
-            .replace("{POWER}", &self.power.to_string());
+            .replace("{POWER}", &P.to_string());
 
         s
     }
@@ -88,7 +88,7 @@ impl Shape for Mandelbulb {
 /// the squaring in the original 2D mandelbrot. First we convert the point
 /// to spherical coordinates, then we rotate and convert them back.
 #[inline(always)]
-fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
+fn rotate<const P: u8>(p: Point3<f32>) -> Point3<f32> {
     // Handle special case (general formula is not able to handle points on
     // the z axis).
     if p.x == 0.0 && p.y == 0.0 {
@@ -96,8 +96,8 @@ fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
         let theta = (p.z / old_radius).acos();
 
         // Scale and rotate the point
-        let new_radius = old_radius.powi(power.into());
-        let theta = theta * power as f32;
+        let new_radius = old_radius.powi(P.into());
+        let theta = theta * P as f32;
 
         // Convert back to cartesian coordinates
         return new_radius * Point3::new(0.0, 0.0, theta.cos());
@@ -106,7 +106,7 @@ fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
 
     // For some integer powers there are formulas without trigonometric
     // functions. This improves performance a lot (see #17).
-    match power {
+    match P {
         8 => {
             let Point3 { x, y, z } = p;
 
@@ -158,7 +158,7 @@ fn rotate(p: Point3<f32>, power: u8) -> Point3<f32> {
                     * (z4 - 6.0 * z2 * rxy2 + rxy4),
             }
         }
-        _ => {
+        power => {
             let old_radius = (p - CENTER).magnitude();
 
             // Convert to spherical coordinates
