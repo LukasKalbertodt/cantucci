@@ -38,9 +38,9 @@ impl<T> Index<(u32, u32, u32)> for GridTable<T> {
     type Output = T;
 
     fn index(&self, (x, y, z): (u32, u32, u32)) -> &Self::Output {
-        assert!(x < self.size);
-        assert!(y < self.size);
-        assert!(z < self.size);
+        debug_assert!(x < self.size);
+        debug_assert!(y < self.size);
+        debug_assert!(z < self.size);
 
         let idx =
             (x as usize) * (self.size as usize).pow(2)
