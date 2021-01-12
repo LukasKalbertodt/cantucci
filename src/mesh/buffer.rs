@@ -110,10 +110,6 @@ impl MeshBuffer {
         ];
 
         let points = GridTable::fill_with(resolution, |x, y, z| {
-            // World position of this cell's lower corner
-            let p0 = span.start + Vector3::new(x as f32, y as f32, z as f32)
-                .mul_element_wise(step);
-
             // The estimated minimal distances of all eight corners calculated
             // in the prior step.
             let distances = [
@@ -148,6 +144,10 @@ impl MeshBuffer {
                 // This is a bit hacky, but we will never access this number
                 return u32::MAX;
             }
+
+            // World position of this cell's lower corner
+            let p0 = span.start + Vector3::new(x as f32, y as f32, z as f32)
+                .mul_element_wise(step);
 
             // We want to iterate over all 12 edges of the cell. Here, we list
             // all edges by specifying their corner indices.
