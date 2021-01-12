@@ -43,7 +43,12 @@ impl Wgpu {
             .await
             .context("Failed to find an appropiate adapter")?;
 
-        debug!("Created wgpu adapter: {:#?}", adapter.get_info());
+        debug!(
+            "Created wgpu adapter: {} ({:?}, {:?})",
+            adapter.get_info().name,
+            adapter.get_info().backend,
+            adapter.get_info().device_type,
+        );
         trace!("Adapter features: {:#?}", adapter.features());
         trace!("Adapter limits: {:#?}", adapter.limits());
 
