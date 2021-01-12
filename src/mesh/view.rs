@@ -6,7 +6,7 @@ use wgpu::util::DeviceExt;
 use crate::{
     camera::Camera,
     util::ToArr,
-    wgpu::DrawContext,
+    wgpu::{DrawContext, DEPTH_BUFFER_FORMAT},
 };
 use super::Vertex;
 
@@ -62,7 +62,14 @@ impl MeshView {
                         store: true,
                     },
                 }],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: draw_ctx.depth_buffer,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
             });
 
             rpass.push_debug_group("Prepare data for draw.");
@@ -83,8 +90,6 @@ impl MeshView {
         draw_ctx.queue.submit(Some(encoder.finish()));
     }
 }
-
-
 
 pub(crate) fn create_pipeline(
     device: &wgpu::Device,
@@ -125,7 +130,12 @@ pub(crate) fn create_pipeline(
             alpha_blend: wgpu::BlendDescriptor::REPLACE,
             write_mask: wgpu::ColorWrite::ALL,
         }],
-        depth_stencil_state: None,
+        depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+            format: DEPTH_BUFFER_FORMAT,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilStateDescriptor::default(),
+        }),
         vertex_state: wgpu::VertexStateDescriptor {
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {

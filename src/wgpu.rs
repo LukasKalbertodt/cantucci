@@ -14,6 +14,7 @@ pub(crate) struct Wgpu {
     pub(crate) surface: wgpu::Surface,
     pub(crate) swap_chain: wgpu::SwapChain,
     pub(crate) swap_chain_format: wgpu::TextureFormat,
+    pub(crate) depth_buffer: wgpu::TextureView,
     pub(crate) queue: wgpu::Queue,
 }
 
@@ -71,9 +72,8 @@ impl Wgpu {
         trace!("Device features: {:#?}", device.features());
         trace!("Device limits: {:#?}", device.limits());
 
-        let desc = swap_chain_description(window.inner_size());
-        let swap_chain = device.create_swap_chain(&surface, &desc);
-        debug!("Created swapchain with dimensions {}x{}", desc.width, desc.height);
+        let (swap_chain, depth_buffer)
+            = Self::create_output_images(&device, &surface, window.inner_size());
 
         info!("Finished wgpu intialization");
 
@@ -81,30 +81,63 @@ impl Wgpu {
             device: Arc::new(device),
             surface,
             swap_chain,
-            swap_chain_format: desc.format,
+            swap_chain_format: SWAP_CHAIN_FORMAT,
+            depth_buffer,
             queue,
         })
     }
 
     pub(crate) fn recreate_swap_chain(&mut self, new_size: PhysicalSize<u32>) {
-        let desc = swap_chain_description(new_size);
-        self.swap_chain = self.device.create_swap_chain(&self.surface, &desc);
+        let (swap_chain, depth_buffer)
+            = Self::create_output_images(&self.device, &self.surface, new_size);
+        self.swap_chain = swap_chain;
+        self.depth_buffer = depth_buffer;
+    }
+
+    fn create_output_images(
+        device: &wgpu::Device,
+        surface: &wgpu::Surface,
+        size: PhysicalSize<u32>,
+    ) -> (wgpu::SwapChain, wgpu::TextureView) {
+        let desc = wgpu::SwapChainDescriptor {
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            format: SWAP_CHAIN_FORMAT,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+        };
+
+        let swap_chain = device.create_swap_chain(surface, &desc);
+        debug!("Created swapchain with dimensions {}x{}", desc.width, desc.height);
+
+        let depth_buffer = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth Buffer"),
+            size: wgpu::Extent3d {
+                width: desc.width,
+                height: desc.height,
+                depth: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        });
+        let depth_buffer = depth_buffer.create_view(&wgpu::TextureViewDescriptor::default());
+        debug!("Created depth buffer");
+
+        (swap_chain, depth_buffer)
     }
 }
 
-fn swap_chain_description(size: PhysicalSize<u32>) -> wgpu::SwapChainDescriptor {
-    wgpu::SwapChainDescriptor {
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        format: wgpu::TextureFormat::Bgra8UnormSrgb,
-        width: size.width,
-        height: size.height,
-        present_mode: wgpu::PresentMode::Fifo,
-    }
-}
+const SWAP_CHAIN_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
+pub(crate) const DEPTH_BUFFER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DrawContext<'a> {
     pub(crate) frame: &'a wgpu::SwapChainTexture,
     pub(crate) device: &'a wgpu::Device,
     pub(crate) queue: &'a wgpu::Queue,
+    pub(crate) depth_buffer: &'a wgpu::TextureView,
 }

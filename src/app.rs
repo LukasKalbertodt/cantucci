@@ -143,6 +143,7 @@ impl App {
             queue: &self.wgpu.queue,
             device: &self.wgpu.device,
             frame: &frame,
+            depth_buffer: &self.wgpu.depth_buffer,
         };
 
         self.sky.dome().draw(draw_ctx, &self.control.camera());

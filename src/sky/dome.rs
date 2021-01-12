@@ -3,7 +3,7 @@ use std::mem;
 use cgmath::{Matrix4, Vector4};
 use wgpu::util::DeviceExt;
 
-use crate::{camera::Camera, prelude::*, util::ToArr, wgpu::DrawContext};
+use crate::{camera::Camera, prelude::*, util::ToArr, wgpu::{DEPTH_BUFFER_FORMAT, DrawContext}};
 use super::SKY_DISTANCE;
 
 
@@ -63,7 +63,12 @@ impl Dome {
                 alpha_blend: wgpu::BlendDescriptor::REPLACE,
                 write_mask: wgpu::ColorWrite::ALL,
             }],
-            depth_stencil_state: None,
+            depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+                format: DEPTH_BUFFER_FORMAT,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: wgpu::StencilStateDescriptor::default(),
+            }),
             vertex_state: wgpu::VertexStateDescriptor {
                 index_format: wgpu::IndexFormat::Uint16,
                 vertex_buffers: &[wgpu::VertexBufferDescriptor {
@@ -116,7 +121,14 @@ impl Dome {
                         store: true,
                     },
                 }],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: draw_ctx.depth_buffer,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: false,
+                    }),
+                    stencil_ops: None,
+                }),
             });
 
             rpass.push_debug_group("Prepare data for draw.");
