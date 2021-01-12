@@ -94,32 +94,27 @@ impl MeshBuffer {
         // cell does not cross the surface.
         //
         let mut vertices = Vec::new();
+
+        // The world space distance between two corners/between the
+        // center points of two cells.
+        let step = (span.end - span.start) / resolution as f32;
+        let corner_offsets = [
+            Vector3::new(   0.0,    0.0,    0.0),
+            Vector3::new(   0.0,    0.0, step.z),
+            Vector3::new(   0.0, step.y,    0.0),
+            Vector3::new(   0.0, step.y, step.z),
+            Vector3::new(step.x,    0.0,    0.0),
+            Vector3::new(step.x,    0.0, step.z),
+            Vector3::new(step.x, step.y,    0.0),
+            Vector3::new(step.x, step.y, step.z),
+        ];
+
         let points = GridTable::fill_with(resolution, |x, y, z| {
-            // Calculate the position of all eight corners of the current cell
-            // in world space. The term "lower corner" describes the corner
-            // with the lowest x, y and z coordinates.
-            let corners = {
-                // The world space distance between two corners/between the
-                // center points of two cells.
-                let step = (span.end - span.start) / resolution as f32;
-
-                // World position of this cell's lower corner
-                let p0 = span.start + Vector3::new(x, y, z)
-                    .cast::<f32>()
-                    .unwrap()
-                    .mul_element_wise(step);
-
-                [
-                    p0 + Vector3::new(   0.0,    0.0,    0.0),
-                    p0 + Vector3::new(   0.0,    0.0, step.z),
-                    p0 + Vector3::new(   0.0, step.y,    0.0),
-                    p0 + Vector3::new(   0.0, step.y, step.z),
-                    p0 + Vector3::new(step.x,    0.0,    0.0),
-                    p0 + Vector3::new(step.x,    0.0, step.z),
-                    p0 + Vector3::new(step.x, step.y,    0.0),
-                    p0 + Vector3::new(step.x, step.y, step.z),
-                ]
-            };
+            // World position of this cell's lower corner
+            let p0 = span.start + Vector3::new(x, y, z)
+                .cast::<f32>()
+                .unwrap()
+                .mul_element_wise(step);
 
             // The estimated minimal distances of all eight corners calculated
             // in the prior step.
@@ -237,7 +232,7 @@ impl MeshBuffer {
                         (d_from + delta) / delta
                     };
 
-                    lerp(corners[from], corners[to], weight_from)
+                    lerp(p0 + corner_offsets[from], p0 + corner_offsets[to], weight_from)
                 });
 
             // As described in the article above, we simply use the centroid
