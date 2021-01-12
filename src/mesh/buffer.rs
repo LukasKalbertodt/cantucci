@@ -146,7 +146,7 @@ impl MeshBuffer {
             if no_shape_crossing {
                 // FIXME
                 // This is a bit hacky, but we will never access this number
-                return None;
+                return u32::MAX;
             }
 
             // We want to iterate over all 12 edges of the cell. Here, we list
@@ -269,7 +269,8 @@ impl MeshBuffer {
                 normal: normal.to_arr(),
                 distance_from_surface: dist_p,
             });
-            Some(vertices.len() as u32 - 1)
+
+            vertices.len() as u32 - 1
         });
 
         let before_third = Instant::now();
@@ -298,10 +299,10 @@ impl MeshBuffer {
 
             // Edge from the current corner pointing in +x direction
             if y > 0 && z > 0 && base_sign != dists[(x + 1, y, z)].is_sign_positive()  {
-                let v0 = points[(x, y - 1, z - 1)].unwrap();
-                let v1 = points[(x, y - 1, z    )].unwrap();
-                let v2 = points[(x, y    , z - 1)].unwrap();
-                let v3 = points[(x, y    , z    )].unwrap();
+                let v0 = points[(x, y - 1, z - 1)];
+                let v1 = points[(x, y - 1, z    )];
+                let v2 = points[(x, y    , z - 1)];
+                let v3 = points[(x, y    , z    )];
 
                 indices.extend_from_slice(&
                     // distance negative, triangle cw
@@ -322,10 +323,10 @@ impl MeshBuffer {
 
             // Edge from the current corner pointing in +y direction
             if x > 0 && z > 0 && base_sign != dists[(x, y + 1, z)].is_sign_positive()  {
-                let v0 = points[(x - 1, y, z - 1)].unwrap();
-                let v1 = points[(x - 1, y, z    )].unwrap();
-                let v2 = points[(x,     y, z - 1)].unwrap();
-                let v3 = points[(x,     y, z    )].unwrap();
+                let v0 = points[(x - 1, y, z - 1)];
+                let v1 = points[(x - 1, y, z    )];
+                let v2 = points[(x,     y, z - 1)];
+                let v3 = points[(x,     y, z    )];
 
                 indices.extend_from_slice(&
                     // distance negative, triangle cw
@@ -346,10 +347,10 @@ impl MeshBuffer {
 
             // Edge from the current corner pointing in +z direction
             if x > 0 && y > 0 && base_sign != dists[(x, y, z + 1)].is_sign_positive()  {
-                let v0 = points[(x - 1, y - 1, z)].unwrap();
-                let v1 = points[(x - 1, y    , z)].unwrap();
-                let v2 = points[(x,     y - 1, z)].unwrap();
-                let v3 = points[(x,     y    , z)].unwrap();
+                let v0 = points[(x - 1, y - 1, z)];
+                let v1 = points[(x - 1, y    , z)];
+                let v2 = points[(x,     y - 1, z)];
+                let v3 = points[(x,     y    , z)];
 
                 indices.extend_from_slice(&
                     // distance negative, triangle cw
