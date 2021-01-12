@@ -18,6 +18,16 @@ pub struct CubeIter {
 impl Iterator for CubeIter {
     type Item = (u32, u32, u32);
 
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.size as usize;
+        let exact = size.pow(3)
+            - self.x as usize * size.pow(2)
+            - self.y as usize * size
+            - self.z as usize;
+
+        (exact, Some(exact))
+    }
+
     fn next(&mut self) -> Option<Self::Item> {
         if self.x == self.size {
             None
