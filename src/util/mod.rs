@@ -3,7 +3,7 @@ use cgmath::{BaseNum, Matrix4, Point3, Vector3};
 // pub mod gl;
 pub mod iter;
 pub mod grid;
-// pub mod time;
+pub mod time;
 
 
 pub trait ToArr {

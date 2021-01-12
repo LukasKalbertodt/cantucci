@@ -26,6 +26,7 @@ use crate::{
     camera::Projection,
     control::{CamControl, Fly as FlyControl, KeySwitcher, Orbit as OrbitControl},
     event::{EventHandler, EventResponse, QuitHandler},
+    mesh::ShapeMesh,
     prelude::*,
     shape::{Mandelbulb, Shape},
     sky::Sky,
@@ -83,8 +84,10 @@ struct App {
     control: KeySwitcher<OrbitControl, FlyControl>,
     fps_timer: FpsTimer,
     last_update: Instant,
+
     sky: Sky,
     shape: Arc<dyn Shape>,
+    mesh: ShapeMesh,
 }
 
 impl App {
@@ -101,6 +104,8 @@ impl App {
         let sky = Sky::new(&wgpu.device, wgpu.swap_chain_format)?;
         let shape = Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<dyn Shape>;
 
+        let mesh = ShapeMesh::new(&wgpu.device, shape.clone())?;
+
         Ok(Self {
             window,
             wgpu,
@@ -108,8 +113,10 @@ impl App {
             control: switcher,
             fps_timer: FpsTimer::new(),
             last_update: Instant::now(),
+
             sky,
             shape,
+            mesh,
         })
     }
 
@@ -119,6 +126,7 @@ impl App {
         self.last_update = now;
 
         self.control.update(delta.as_secs_f32(), &*self.shape);
+        self.mesh.update(self.wgpu.device.clone(), &self.control.camera());
     }
 
     fn draw(&mut self) -> Result<()> {
@@ -176,8 +184,8 @@ impl FpsTimer {
     }
 
     fn register_frame(&mut self) {
-    self.frames_since_last_report += 1;
-}
+        self.frames_since_last_report += 1;
+    }
 
     /// Returns `Some(fps)` every `REPORT_INTERVAL`.
     pub(crate) fn report_fps(&mut self) -> Option<f64> {
@@ -195,37 +203,13 @@ impl FpsTimer {
 }
 
 
-// pub struct App {
-//     facade: GlutinFacade,
-//     mesh: ShapeMesh,
-//     env: Environment,
-//     print_fps: bool,
-// }
-
-// impl App {
-//     /// Creates all needed resources, including the OpenGL context.
-//     pub fn init() -> Result<Self> {
-//         // Create OpenGL context
-//         let facade = create_context()
-//             .chain_err(|| "failed to create GL context")?;
-
 //         let shape = if ::std::env::args().len() > 1 {
 //             Arc::new(Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.0)) as Arc<dyn Shape>
 //         } else {
 //             Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<dyn Shape>
 //         };
-//         let mesh = ShapeMesh::new(&facade, shape)?;
 
-//         let env = Environment::new(&facade)?;
 
-//         Ok(App {
-//             facade: facade,
-//             control: Box::new(switcher),
-//             mesh: mesh,
-//             env: env,
-//             print_fps: false,
-//         })
-//     }
 
 //     /// Contains the main loop used to show stuff on the screen.
 //     pub fn run(&mut self) -> Result<()> {

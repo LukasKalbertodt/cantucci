@@ -1,19 +1,29 @@
-use std::time::{Duration, Instant};
-use std::fmt;
-use std::ops;
+use std::{
+    time::{Duration, Instant},
+    fmt,
+    ops,
+};
 
-use math::*;
-use shape::Shape;
-use octree::Span;
-use util::ToArr;
-use util::iter::cube;
-use util::grid::GridTable;
-use util::time::DurationExt;
+use cgmath::{prelude::*, Point3, Vector3};
+
+use crate::{
+    prelude::*,
+    math::lerp,
+    shape::Shape,
+    octree::Span,
+    util::{
+        ToArr,
+        iter::cube,
+        grid::GridTable,
+        time::DurationExt,
+    },
+};
+use super::Vertex;
 
 
 pub struct MeshBuffer {
-    raw_vbuf: Vec<Vertex>,
-    raw_ibuf: Vec<u32>,
+    pub(crate) vertices: Vec<Vertex>,
+    pub(crate) indices: Vec<u32>,
 }
 
 impl MeshBuffer {
@@ -83,7 +93,7 @@ impl MeshBuffer {
         // the index of the vertex corresponding to the cell, or `None` if the
         // cell does not cross the surface.
         //
-        let mut raw_vbuf = Vec::new();
+        let mut vertices = Vec::new();
         let points = GridTable::fill_with(resolution, |x, y, z| {
             // Calculate the position of all eight corners of the current cell
             // in world space. The term "lower corner" describes the corner
@@ -250,12 +260,12 @@ impl MeshBuffer {
                 ).normalize()
             };
 
-            raw_vbuf.push(Vertex {
+            vertices.push(Vertex {
                 position: p.to_vec().to_arr(),
                 normal: normal.to_arr(),
                 distance_from_surface: dist_p,
             });
-            Some(raw_vbuf.len() as u32 - 1)
+            Some(vertices.len() as u32 - 1)
         });
 
         let before_third = Instant::now();
@@ -269,7 +279,7 @@ impl MeshBuffer {
         // shape, we will generate one face. This face's vertices are the
         // vertices inside the four cells the edge is adjacent to.
         //
-        let mut raw_ibuf = Vec::new();
+        let mut indices = Vec::new();
         for (x, y, z) in cube(resolution) {
             // We iterate over all edges by iterating over all lower corners of
             // all cells.
@@ -287,7 +297,7 @@ impl MeshBuffer {
                 let v2 = points[(x, y    , z - 1)].unwrap();
                 let v3 = points[(x, y    , z    )].unwrap();
 
-                raw_ibuf.extend_from_slice(&
+                indices.extend_from_slice(&
                     // distance negative, triangle cw
                     if dists[(x, y, z)] < 0.0 {
                         [
@@ -311,7 +321,7 @@ impl MeshBuffer {
                 let v2 = points[(x,     y, z - 1)].unwrap();
                 let v3 = points[(x,     y, z    )].unwrap();
 
-                raw_ibuf.extend_from_slice(&
+                indices.extend_from_slice(&
                     // distance negative, triangle cw
                     if dists[(x, y, z)] < 0.0 {
                         [
@@ -335,7 +345,7 @@ impl MeshBuffer {
                 let v2 = points[(x,     y - 1, z)].unwrap();
                 let v3 = points[(x,     y    , z)].unwrap();
 
-                raw_ibuf.extend_from_slice(&
+                indices.extend_from_slice(&
                     // distance negative, triangle cw
                     if dists[(x, y, z)] < 0.0 {
                         [
@@ -358,26 +368,26 @@ impl MeshBuffer {
             first: before_second - before_first,
             second: before_third - before_second,
             third: after_third -  before_third,
-            vertices: raw_vbuf.len() as u32,
-            faces: raw_ibuf.len() as u32 / 6,
+            vertices: vertices.len() as u32,
+            faces: indices.len() as u32 / 6,
         };
 
         trace!(
             "Generated {:6} points, {:6} faces in {}",
-            raw_vbuf.len(),
-            raw_ibuf.len() / 6,
+            vertices.len(),
+            indices.len() / 6,
             timings,
         );
 
-        (MeshBuffer { raw_vbuf, raw_ibuf }, timings)
+        (MeshBuffer { vertices, indices }, timings)
     }
 
-    pub fn raw_vbuf(&self) -> &[Vertex] {
-        &self.raw_vbuf
+    pub fn vertices(&self) -> &[Vertex] {
+        &self.vertices
     }
 
-    pub fn raw_ibuf(&self) -> &[u32] {
-        &self.raw_ibuf
+    pub fn indices(&self) -> &[u32] {
+        &self.indices
     }
 }
 
@@ -422,13 +432,3 @@ impl ops::Add for Timings {
         }
     }
 }
-
-/// Per vertex data in the generated mesh.
-#[derive(Copy, Clone)]
-pub struct Vertex {
-    position: [f32; 3],
-    normal: [f32; 3],
-    distance_from_surface: f32,
-}
-
-implement_vertex!(Vertex, position, normal, distance_from_surface);

@@ -10,7 +10,7 @@ mod camera;
 mod control;
 mod event;
 mod math;
-// mod mesh;
+mod mesh;
 mod octree;
 mod shape;
 mod sky;

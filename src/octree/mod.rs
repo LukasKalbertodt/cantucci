@@ -301,8 +301,6 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
             _ => unreachable!(),
         };
 
-
-
         *self.node = Octnode::SubTree {
             children: Box::new([Octnode::Leaf(None); 8]),
             data,
