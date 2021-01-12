@@ -1,8 +1,6 @@
 #![feature(array_value_iter, array_map, const_in_array_repeat_expressions)]
 #![feature(or_patterns)]
 
-#![allow(dead_code)] // TODO
-
 #[macro_use] mod util;
 mod app;
 mod prelude;

@@ -10,6 +10,7 @@ pub struct Sphere {
 }
 
 impl Sphere {
+    #[allow(dead_code)]  // TODO
     pub fn new(center: Point3<f32>, radius: f32) -> Self {
         Sphere {
             center,

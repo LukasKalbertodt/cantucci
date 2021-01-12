@@ -381,14 +381,6 @@ impl MeshBuffer {
 
         (MeshBuffer { vertices, indices }, timings)
     }
-
-    pub fn vertices(&self) -> &[Vertex] {
-        &self.vertices
-    }
-
-    pub fn indices(&self) -> &[u32] {
-        &self.indices
-    }
 }
 
 
