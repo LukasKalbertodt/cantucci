@@ -182,7 +182,7 @@ impl MeshBuffer {
             // Instead, we simply weight both endpoints of the edge by the
             // already calculated distances. Improving this might be worth
             // experimenting (see #1).
-            let points: Vec<_> = EDGES.iter().cloned()
+            let edge_crossings = EDGES.iter().cloned()
 
                 // We are only interested in the edges with shape crossing. The
                 // edge crosses the shape iff the endpoints' estimated minimal
@@ -237,12 +237,14 @@ impl MeshBuffer {
                     };
 
                     lerp(corners[from], corners[to], weight_from)
-                })
-                .collect();
+                });
 
             // As described in the article above, we simply use the centroid
             // of all edge crossings.
-            let p = Point3::centroid(&points);
+            let (count, total_displacement) = edge_crossings.fold(
+                (0, Vector3::zero()),
+                |(count, sum), p| (count + 1, sum + p.to_vec()));
+            let p = Point3::origin() + (total_displacement / count as f32);
 
             // Now we only calculate some meta data which might be used to
             // color the vertex.
