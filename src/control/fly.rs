@@ -173,7 +173,7 @@ impl EventHandler for Fly {
             } => {
                 let (mut theta, mut phi) = self.cam.spherical_coords();
                 theta += TURN_PER_PIXEL * *y as f32;
-                phi += TURN_PER_PIXEL * 2.0 * *x as f32;
+                phi -= TURN_PER_PIXEL * 2.0 * *x as f32;
 
                 self.cam.look_at_sphere(theta, phi);
 
