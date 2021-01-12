@@ -11,7 +11,7 @@ mod control;
 mod event;
 mod math;
 // mod mesh;
-// mod octree;
+mod octree;
 mod shape;
 mod sky;
 

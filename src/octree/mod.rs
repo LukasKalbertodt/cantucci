@@ -1,12 +1,13 @@
 use std::{array::IntoIter, ops::Range};
 
-use math::*;
+use cgmath::Point3;
+
 
 mod iter;
-mod debug_view;
+// mod debug_view;
 
 pub use self::iter::{Iter, IterElemMut, IterMut};
-pub use self::debug_view::DebugView;
+// pub use self::debug_view::DebugView;
 
 /// A box in three dimensional space that is represented by one octree node
 pub type Span = Range<Point3<f32>>;
