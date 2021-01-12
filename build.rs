@@ -15,6 +15,8 @@ fn main() -> Result<()> {
 const SHADERS: &[&str] = &[
     "dome.vert",
     "dome.frag",
+    "surface.vert",
+    "surface.frag",
 ];
 
 fn compile_shaders() -> Result<()> {

@@ -103,8 +103,7 @@ impl App {
 
         let sky = Sky::new(&wgpu.device, wgpu.swap_chain_format)?;
         let shape = Arc::new(Mandelbulb::classic(6, 2.5)) as Arc<dyn Shape>;
-
-        let mesh = ShapeMesh::new(&wgpu.device, shape.clone())?;
+        let mesh = ShapeMesh::new(&wgpu.device, wgpu.swap_chain_format, shape.clone())?;
 
         Ok(Self {
             window,
@@ -141,6 +140,7 @@ impl App {
             .output;
 
         self.sky.dome().draw(&frame, &self.wgpu.device, &self.wgpu.queue, &self.control.camera());
+        self.mesh.draw(&frame, &self.wgpu.device, &self.wgpu.queue, &self.control.camera());
 
 
         self.window.request_redraw();
