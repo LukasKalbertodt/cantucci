@@ -74,9 +74,10 @@ impl MeshBuffer {
         // We partition our box into regular cells. For each corner in between
         // the cells we calculate and save the estimated minimal distance from
         // the shape.
+        let across_span = span.end - span.start;
         let dists = GridTable::fill_with(resolution + 1, |x, y, z| {
-            let v = Vector3::new(x, y, z).cast::<f32>().unwrap() / (resolution as f32);
-            let p = span.start + (span.end - span.start).mul_element_wise(v);
+            let v = Vector3::new(x as f32, y as f32, z as f32) / (resolution as f32);
+            let p = span.start + across_span.mul_element_wise(v);
 
             shape.min_distance_from(p)
         });
