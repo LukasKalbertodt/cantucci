@@ -190,7 +190,7 @@ impl MeshBuffer {
                 // distances have different signs ("minus" means: inside the
                 // shape).
                 .filter(|&(from, to)| {
-                    distances[from].signum() != distances[to].signum()
+                    distances[from].is_sign_positive() != distances[to].is_sign_positive()
                 })
 
                 // Next, we convert the edge into a vertex on said edge. We
@@ -293,8 +293,10 @@ impl MeshBuffer {
             // by definition, also cross the surface). So the Options we access
             // are always `Some()`.
 
+            let base_sign = dists[(x, y, z)].is_sign_positive();
+
             // Edge from the current corner pointing in +x direction
-            if y > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x + 1, y, z)].signum()  {
+            if y > 0 && z > 0 && base_sign != dists[(x + 1, y, z)].is_sign_positive()  {
                 let v0 = points[(x, y - 1, z - 1)].unwrap();
                 let v1 = points[(x, y - 1, z    )].unwrap();
                 let v2 = points[(x, y    , z - 1)].unwrap();
@@ -318,7 +320,7 @@ impl MeshBuffer {
             }
 
             // Edge from the current corner pointing in +y direction
-            if x > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x, y + 1, z)].signum()  {
+            if x > 0 && z > 0 && base_sign != dists[(x, y + 1, z)].is_sign_positive()  {
                 let v0 = points[(x - 1, y, z - 1)].unwrap();
                 let v1 = points[(x - 1, y, z    )].unwrap();
                 let v2 = points[(x,     y, z - 1)].unwrap();
@@ -342,7 +344,7 @@ impl MeshBuffer {
             }
 
             // Edge from the current corner pointing in +z direction
-            if x > 0 && y > 0 && dists[(x, y, z)].signum() != dists[(x, y, z + 1)].signum()  {
+            if x > 0 && y > 0 && base_sign != dists[(x, y, z + 1)].is_sign_positive()  {
                 let v0 = points[(x - 1, y - 1, z)].unwrap();
                 let v1 = points[(x - 1, y    , z)].unwrap();
                 let v2 = points[(x,     y - 1, z)].unwrap();
