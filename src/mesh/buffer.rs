@@ -111,9 +111,7 @@ impl MeshBuffer {
 
         let points = GridTable::fill_with(resolution, |x, y, z| {
             // World position of this cell's lower corner
-            let p0 = span.start + Vector3::new(x, y, z)
-                .cast::<f32>()
-                .unwrap()
+            let p0 = span.start + Vector3::new(x as f32, y as f32, z as f32)
                 .mul_element_wise(step);
 
             // The estimated minimal distances of all eight corners calculated
