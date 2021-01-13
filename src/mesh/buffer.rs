@@ -74,9 +74,10 @@ impl MeshBuffer {
         // We partition our box into regular cells. For each corner in between
         // the cells we calculate and save the estimated minimal distance from
         // the shape.
+        let across_span = span.end - span.start;
         let dists = GridTable::fill_with(resolution + 1, |x, y, z| {
-            let v = Vector3::new(x, y, z).cast::<f32>().unwrap() / (resolution as f32);
-            let p = span.start + (span.end - span.start).mul_element_wise(v);
+            let v = Vector3::new(x as f32, y as f32, z as f32) / (resolution as f32);
+            let p = span.start + across_span.mul_element_wise(v);
 
             shape.min_distance_from(p)
         });
@@ -94,33 +95,22 @@ impl MeshBuffer {
         // cell does not cross the surface.
         //
         let mut vertices = Vec::new();
+
+        // The world space distance between two corners/between the
+        // center points of two cells.
+        let step = (span.end - span.start) / resolution as f32;
+        let corner_offsets = [
+            Vector3::new(   0.0,    0.0,    0.0),
+            Vector3::new(   0.0,    0.0, step.z),
+            Vector3::new(   0.0, step.y,    0.0),
+            Vector3::new(   0.0, step.y, step.z),
+            Vector3::new(step.x,    0.0,    0.0),
+            Vector3::new(step.x,    0.0, step.z),
+            Vector3::new(step.x, step.y,    0.0),
+            Vector3::new(step.x, step.y, step.z),
+        ];
+
         let points = GridTable::fill_with(resolution, |x, y, z| {
-            // Calculate the position of all eight corners of the current cell
-            // in world space. The term "lower corner" describes the corner
-            // with the lowest x, y and z coordinates.
-            let corners = {
-                // The world space distance between two corners/between the
-                // center points of two cells.
-                let step = (span.end - span.start) / resolution as f32;
-
-                // World position of this cell's lower corner
-                let p0 = span.start + Vector3::new(x, y, z)
-                    .cast::<f32>()
-                    .unwrap()
-                    .mul_element_wise(step);
-
-                [
-                    p0 + Vector3::new(   0.0,    0.0,    0.0),
-                    p0 + Vector3::new(   0.0,    0.0, step.z),
-                    p0 + Vector3::new(   0.0, step.y,    0.0),
-                    p0 + Vector3::new(   0.0, step.y, step.z),
-                    p0 + Vector3::new(step.x,    0.0,    0.0),
-                    p0 + Vector3::new(step.x,    0.0, step.z),
-                    p0 + Vector3::new(step.x, step.y,    0.0),
-                    p0 + Vector3::new(step.x, step.y, step.z),
-                ]
-            };
-
             // The estimated minimal distances of all eight corners calculated
             // in the prior step.
             let distances = [
@@ -137,20 +127,32 @@ impl MeshBuffer {
             // First, check if the current cell is only partially inside the
             // shape (if the cell intersects the shape's surface). If that's
             // not the case, we won't generate a vertex for this cell.
-            let partially_in = !(
-                distances.iter().all(|&d| d < 0.0) ||
-                distances.iter().all(|&d| d > 0.0)
-            );
+            let no_shape_crossing = {
+                let first = distances[0].is_sign_positive();
+                let mut all_same = true;
+                for d in &distances[1..] {
+                    if d.is_sign_positive() != first {
+                        all_same = false;
+                        break;
+                    }
+                }
 
-            if !partially_in {
+                all_same
+            };
+
+            if no_shape_crossing {
                 // FIXME
                 // This is a bit hacky, but we will never access this number
-                return None;
+                return u32::MAX;
             }
+
+            // World position of this cell's lower corner
+            let p0 = span.start + Vector3::new(x as f32, y as f32, z as f32)
+                .mul_element_wise(step);
 
             // We want to iterate over all 12 edges of the cell. Here, we list
             // all edges by specifying their corner indices.
-            const EDGES: [(usize, usize); 12] = [
+            const EDGES: [(u8, u8); 12] = [
                 // Edges whose endpoints differ in the x coordinate (first
                 // corner id is -x, second is +x).
                 (0, 4),     //    -y -z
@@ -182,14 +184,15 @@ impl MeshBuffer {
             // Instead, we simply weight both endpoints of the edge by the
             // already calculated distances. Improving this might be worth
             // experimenting (see #1).
-            let points: Vec<_> = EDGES.iter().cloned()
+            let edge_crossings = EDGES.iter().cloned()
+                .map(|(from, to)| (from as usize, to as usize))
 
                 // We are only interested in the edges with shape crossing. The
                 // edge crosses the shape iff the endpoints' estimated minimal
                 // distances have different signs ("minus" means: inside the
                 // shape).
                 .filter(|&(from, to)| {
-                    distances[from].signum() != distances[to].signum()
+                    distances[from].is_sign_positive() != distances[to].is_sign_positive()
                 })
 
                 // Next, we convert the edge into a vertex on said edge. We
@@ -236,13 +239,15 @@ impl MeshBuffer {
                         (d_from + delta) / delta
                     };
 
-                    lerp(corners[from], corners[to], weight_from)
-                })
-                .collect();
+                    lerp(p0 + corner_offsets[from], p0 + corner_offsets[to], weight_from)
+                });
 
             // As described in the article above, we simply use the centroid
             // of all edge crossings.
-            let p = Point3::centroid(&points);
+            let (count, total_displacement) = edge_crossings.fold(
+                (0, Vector3::zero()),
+                |(count, sum), p| (count + 1, sum + p.to_vec()));
+            let p = Point3::origin() + (total_displacement / count as f32);
 
             // Now we only calculate some meta data which might be used to
             // color the vertex.
@@ -265,7 +270,8 @@ impl MeshBuffer {
                 normal: normal.to_arr(),
                 distance_from_surface: dist_p,
             });
-            Some(vertices.len() as u32 - 1)
+
+            vertices.len() as u32 - 1
         });
 
         let before_third = Instant::now();
@@ -290,12 +296,14 @@ impl MeshBuffer {
             // by definition, also cross the surface). So the Options we access
             // are always `Some()`.
 
+            let base_sign = dists[(x, y, z)].is_sign_positive();
+
             // Edge from the current corner pointing in +x direction
-            if y > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x + 1, y, z)].signum()  {
-                let v0 = points[(x, y - 1, z - 1)].unwrap();
-                let v1 = points[(x, y - 1, z    )].unwrap();
-                let v2 = points[(x, y    , z - 1)].unwrap();
-                let v3 = points[(x, y    , z    )].unwrap();
+            if y > 0 && z > 0 && base_sign != dists[(x + 1, y, z)].is_sign_positive()  {
+                let v0 = points[(x, y - 1, z - 1)];
+                let v1 = points[(x, y - 1, z    )];
+                let v2 = points[(x, y    , z - 1)];
+                let v3 = points[(x, y    , z    )];
 
                 indices.extend_from_slice(&
                     // distance negative, triangle cw
@@ -315,11 +323,11 @@ impl MeshBuffer {
             }
 
             // Edge from the current corner pointing in +y direction
-            if x > 0 && z > 0 && dists[(x, y, z)].signum() != dists[(x, y + 1, z)].signum()  {
-                let v0 = points[(x - 1, y, z - 1)].unwrap();
-                let v1 = points[(x - 1, y, z    )].unwrap();
-                let v2 = points[(x,     y, z - 1)].unwrap();
-                let v3 = points[(x,     y, z    )].unwrap();
+            if x > 0 && z > 0 && base_sign != dists[(x, y + 1, z)].is_sign_positive()  {
+                let v0 = points[(x - 1, y, z - 1)];
+                let v1 = points[(x - 1, y, z    )];
+                let v2 = points[(x,     y, z - 1)];
+                let v3 = points[(x,     y, z    )];
 
                 indices.extend_from_slice(&
                     // distance negative, triangle cw
@@ -339,11 +347,11 @@ impl MeshBuffer {
             }
 
             // Edge from the current corner pointing in +z direction
-            if x > 0 && y > 0 && dists[(x, y, z)].signum() != dists[(x, y, z + 1)].signum()  {
-                let v0 = points[(x - 1, y - 1, z)].unwrap();
-                let v1 = points[(x - 1, y    , z)].unwrap();
-                let v2 = points[(x,     y - 1, z)].unwrap();
-                let v3 = points[(x,     y    , z)].unwrap();
+            if x > 0 && y > 0 && base_sign != dists[(x, y, z + 1)].is_sign_positive()  {
+                let v0 = points[(x - 1, y - 1, z)];
+                let v1 = points[(x - 1, y    , z)];
+                let v2 = points[(x,     y - 1, z)];
+                let v3 = points[(x,     y    , z)];
 
                 indices.extend_from_slice(&
                     // distance negative, triangle cw
