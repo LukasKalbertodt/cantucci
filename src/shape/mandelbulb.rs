@@ -16,6 +16,8 @@ const CENTER: Point3<f32> = Point3 { x: 0.0, y: 0.0, z: 0.0 };
 
 impl<const P: u8> Mandelbulb<P> {
     pub fn new(max_iters: u64, bailout: f32) -> Self {
+        assert!(max_iters >= 1);
+
         Mandelbulb {
             max_iters,
             bailout,
@@ -60,7 +62,7 @@ impl<const P: u8> Shape for Mandelbulb<P> {
 
         for _ in 0..self.max_iters {
             r = (z - CENTER).magnitude();
-            if r > self.bailout || (1.0 / r).is_infinite() {
+            if r > self.bailout {
                 break;
             }
 
@@ -68,7 +70,7 @@ impl<const P: u8> Shape for Mandelbulb<P> {
             z = rotate::<P>(z) + (p - CENTER);
         }
 
-        let ln_r = if r == 0.0 { 0.0 } else { r.ln() * r };
+        let ln_r = r.ln() * r;
         0.5 * ln_r / dr
     }
 
