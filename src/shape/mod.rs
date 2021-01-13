@@ -6,6 +6,9 @@ mod util;
 mod mandelbulb;
 mod sphere;
 
+#[cfg(test)]
+mod bench;
+
 pub use self::mandelbulb::Mandelbulb;
 pub use self::sphere::Sphere;
 
