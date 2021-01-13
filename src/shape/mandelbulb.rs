@@ -1,6 +1,6 @@
 use std::ops::Range;
+use cgmath::{prelude::*, Point3};
 
-use math::*;
 use super::Shape;
 
 /// Represents the 3D version of the classical mandelbulb described [here][1].
@@ -18,9 +18,9 @@ const CENTER: Point3<f32> = Point3 { x: 0.0, y: 0.0, z: 0.0 };
 impl Mandelbulb {
     pub fn new(power: u8, max_iters: u64, bailout: f32) -> Self {
         Mandelbulb {
-            power: power,
-            max_iters: max_iters,
-            bailout: bailout,
+            power,
+            max_iters,
+            bailout,
         }
     }
 

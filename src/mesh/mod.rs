@@ -1,50 +1,40 @@
-use glium::backend::Facade;
-use glium::Surface;
-use glium::glutin::{Event, ElementState, VirtualKeyCode};
+use cgmath::{prelude::*, Point3, Vector3};
 use num_cpus;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::{array::IntoIter, sync::mpsc::{channel, Receiver, Sender}};
 use std::sync::Arc;
 use threadpool::ThreadPool;
-use util::iter;
 
-use camera::Camera;
-use math::*;
-use shape::Shape;
-use env::Environment;
-use errors::*;
-use octree::{DebugView, Octree, SpanExt};
-use event::{EventHandler, EventResponse};
+use crate::{
+    prelude::*,
+    camera::Camera,
+    octree::{Octree, SpanExt},
+    shape::Shape,
+    util::iter,
+    wgpu::DrawContext,
+};
 
 mod buffer;
-mod renderer;
 mod view;
 
 use self::buffer::{MeshBuffer, Timings};
 use self::view::MeshView;
-use self::renderer::Renderer;
 
 /// Type to manage the graphical representation of the shape. It updates the
 /// internal data depending on the camera position and resolution.
 pub struct ShapeMesh {
     /// This octree holds the whole mesh.
     tree: Octree<MeshStatus, ()>,
-
-    /// Holds global data (like the OpenGL program) to render the mesh.
-    renderer: Renderer,
+    pipeline: wgpu::RenderPipeline,
 
     /// The shape this mesh represents.
-    shape: Arc<Shape>,
-
-    /// Show the borders of the octree
-    debug_octree: DebugView,
+    shape: Arc<dyn Shape>,
 
     // The following fields are simply to manage the generation of the mesh on
     // multiple threads.
     thread_pool: ThreadPool,
-    new_meshes: Receiver<(Point3<f32>, (MeshBuffer, Timings))>,
-    mesh_tx: Sender<(Point3<f32>, (MeshBuffer, Timings))>,
+    new_meshes: Receiver<(Point3<f32>, (MeshView, Timings))>,
+    mesh_tx: Sender<(Point3<f32>, (MeshView, Timings))>,
     active_jobs: u64,
-    show_debug: bool,
 
     // These are just for debugging/time measuring purposes
     batch_timings: Timings,
@@ -52,12 +42,16 @@ pub struct ShapeMesh {
 }
 
 impl ShapeMesh {
-    pub fn new<F: Facade>(facade: &F, shape: Arc<Shape>) -> Result<Self> {
+    pub fn new(
+        device: &wgpu::Device,
+        out_format: wgpu::TextureFormat,
+        shape: Arc<dyn Shape>,
+    ) -> Result<Self> {
         // Setup an empty tree and split the first two levels which results in
         // 8² = 64 children
         let mut tree = Octree::spanning(shape.bounding_box());
         let _ = tree.root_mut().split(None);
-        for mut child in tree.root_mut().into_children().unwrap() {
+        for mut child in IntoIter::new(tree.root_mut().into_children().unwrap()) {
             child.split(None);
         }
 
@@ -68,31 +62,24 @@ impl ShapeMesh {
         let pool = ThreadPool::new(num_threads);
         info!("Using {} threads to generate mesh", num_threads);
 
-        let renderer = Renderer::new(facade, &*shape)?;
-        let debug_octree = DebugView::new(facade)?;
+        let pipeline = view::create_pipeline(device, out_format);
 
         Ok(ShapeMesh {
-            tree: tree,
-            renderer: renderer,
-            shape: shape,
-            debug_octree: debug_octree,
+            tree,
+            pipeline,
+            shape,
             thread_pool: pool,
             new_meshes: rx,
             mesh_tx: tx,
             active_jobs: 0,
-            show_debug: true,
             batch_timings: Timings::default(),
             finished_jobs: 0,
         })
     }
 
-    pub fn shape(&self) -> &Shape {
-        &*self.shape
-    }
-
     /// Updates the mesh representing the shape. It increases resolution dynamically when
     /// camera is close to the objects surface.
-    pub fn update<F: Facade>(&mut self, facade: &F, camera: &Camera) -> Result<()> {
+    pub fn update(&mut self, device: Arc<wgpu::Device>, camera: &Camera) {
         /// Constant that corresponds to the amount of focus points used to determine which octree
         /// nodes are to be split (drawn in higher resolution). In the end FOCUS_POINTS² points
         /// are distributed over the near plane.
@@ -104,12 +91,7 @@ impl ShapeMesh {
         let focii = self.get_focii(camera, FOCUS_POINTS);
         for focus in focii {
             if let Some(mut leaf) = self.tree.leaf_around_mut(focus) {
-                let do_split = if let &Some(MeshStatus::Ready(_)) = leaf.leaf_data().unwrap() {
-                    true
-                } else {
-                    false
-                };
-                if do_split {
+                if let Some(MeshStatus::Ready(_)) = leaf.leaf_data().unwrap() {
                     let dist = camera.position.distance(focus);
                     let span = leaf.span();
                     let threshold = 2.0 * (span.end.x - span.start.x).abs();
@@ -125,24 +107,17 @@ impl ShapeMesh {
         let finished_jobs_before = self.finished_jobs;
 
         // Collect generated meshes and prepare them for rendering.
-        for (center, (buf, timings)) in self.new_meshes.try_iter() {
+        for (center, (view, timings)) in self.new_meshes.try_iter() {
             self.active_jobs -= 1;
             self.finished_jobs += 1;
             self.batch_timings = self.batch_timings + timings;
 
-            // Create OpenGL view from raw buffer and save it in the
-            // tree.
-            // We haven't yet measured how expensive this is. If it gets too
-            // slow, we might want to limit the number of `from_raw_buf()`
-            // calls we can do in one `update()` call in order to avoid
-            // too long delays within frames.
-            let mesh_view = MeshView::from_raw_buf(buf, facade)?;
             *self.tree
                 .leaf_around_mut(center)
                 // we know that `center` is within the bound of the octree
                 .unwrap()
                 .leaf_data_mut()
-                .unwrap() = Some(MeshStatus::Ready(mesh_view));
+                .unwrap() = Some(MeshStatus::Ready(view));
         }
 
 
@@ -160,12 +135,16 @@ impl ShapeMesh {
             // Prepare values to be moved into the closure.
             let tx = self.mesh_tx.clone();
             let shape = self.shape.clone();
+            let device = device.clone();
 
             // Generate the raw buffers on another thread.
             self.thread_pool.execute(move || {
-                let buf = MeshBuffer::generate_for_box(&span, &*shape, RESOLUTION);
-                tx.send((span.center(), buf))
-                    .expect("main thread has hung up, my work was for nothing! :-(");
+                let (buf, timings) = MeshBuffer::generate_for_box(&span, &*shape, RESOLUTION);
+                let view = MeshView::new(&device, &buf.vertices, &buf.indices);
+
+                // If the main thread hung up, it's fine: our thread will be
+                // killed soon, too.
+                let _ = tx.send((span.center(), (view, timings)));
             });
 
             self.active_jobs += 1;
@@ -178,9 +157,7 @@ impl ShapeMesh {
                 Some(MeshStatus::Ready(view)) => Some(view),
                 _ => None,
             };
-            *leaf_data = Some(MeshStatus::Requested {
-                old_view: old_view,
-            });
+            *leaf_data = Some(MeshStatus::Requested { old_view });
         }
 
         if jobs_before != self.active_jobs {
@@ -198,37 +175,29 @@ impl ShapeMesh {
             );
             self.batch_timings = Timings::default();
         }
-
-        Ok(())
     }
 
     // Draws the whole shape by traversing the internal octree.
-    pub fn draw<S: Surface>(
+    pub(crate) fn draw(
         &self,
-        surface: &mut S,
+        draw_ctx: DrawContext<'_>,
         camera: &Camera,
-        env: &Environment,
-    ) -> Result<()> {
+    ) {
         // Visit each node of the tree.
         // TODO: we might want visit the nodes in a different order (see #16)
 
         let it = self.tree.iter()
             .filter_map(|n| n.leaf_data().map(|data| (data, n.span())));
-        for (leaf_data, span) in it {
+        for (leaf_data, _span) in it {
             match leaf_data {
                 // If there is a view available, render it.
                 &MeshStatus::Ready(ref view) |
                 &MeshStatus::Requested { old_view: Some(ref view) } => {
-                    view.draw(surface, camera, env, &self.renderer)?;
-                    if self.show_debug {
-                        self.debug_octree.draw(surface, camera, span, false)?;
-                    }
+                    view.draw(draw_ctx, camera, &self.pipeline);
                 }
                 _ => (),
             }
         }
-
-        Ok(())
     }
 
     /// Returns points on the near plane distributed in a grid. These points are given
@@ -274,23 +243,24 @@ impl ShapeMesh {
     }
 }
 
-impl EventHandler for ShapeMesh {
-
-    fn handle_event(&mut self, e: &Event) -> EventResponse {
-        match *e {
-            Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::G)) => {
-                self.show_debug = !self.show_debug;
-                EventResponse::Continue
-            },
-            _ => { EventResponse::NotHandled }
-        }
-    }
-
-}
-
 enum MeshStatus {
     Requested {
         old_view: Option<MeshView>,
     },
     Ready(MeshView),
 }
+
+
+/// Per vertex data in the generated mesh.
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct Vertex {
+    position: [f32; 3],
+    normal: [f32; 3],
+    distance_from_surface: f32,
+}
+
+// `Vertex` is inhabited, allows any bitpattern, has no padding, all fields are
+// `Pod`, and is `repr(C)`.
+unsafe impl bytemuck::Pod for Vertex {}
+unsafe impl bytemuck::Zeroable for Vertex {}

@@ -1,13 +1,13 @@
-use arrayvec::ArrayVec;
-use std::ops::Range;
+use std::{array::IntoIter, ops::Range};
 
-use math::*;
+use cgmath::Point3;
+
 
 mod iter;
-mod debug_view;
+// mod debug_view;
 
 pub use self::iter::{Iter, IterElemMut, IterMut};
-pub use self::debug_view::DebugView;
+// pub use self::debug_view::DebugView;
 
 /// A box in three dimensional space that is represented by one octree node
 pub type Span = Range<Point3<f32>>;
@@ -45,7 +45,7 @@ impl<L, I> Octree<L, I> {
     /// Creates an empty octree representing the given span
     pub fn spanning(span: Span) -> Self {
         Octree {
-            span: span,
+            span,
             root: Octnode::Leaf(None),
         }
     }
@@ -81,10 +81,7 @@ impl<L, I> Octree<L, I> {
             if node.is_leaf() {
                 return Some(node);
             } else {
-                node = node
-                    .into_children()
-                    .unwrap()
-                    .into_iter()
+                node = IntoIter::new(node.into_children().unwrap())
                     .find(|c| c.span().contains(p))
                     .unwrap();
             }
@@ -183,21 +180,15 @@ impl<'a, L, I> NodeEntry<'a, L, I> {
 
     /// If the referenced node `n` is *not* a leaf node, eight `NodeEntry`s
     /// referencing all eight children of `n` are returned; `None` otherwise.
-    pub fn children(&self) -> Option<ArrayVec<[Self; 8]>> {
+    pub fn children(&self) -> Option<[Self; 8]> {
         match *self.node {
             Octnode::SubTree { ref children, ..} => {
                 let spans = create_spans(self.span());
-                Some(children
-                    .iter()
-                    .zip(&spans)
-                    .map(|(child, span)| {
-                        NodeEntry {
-                            node: child,
-                            span: span.clone(),
-                        }
-                    })
-                    .collect()
-                )
+                let out = [0, 1, 2, 3, 4, 5, 6, 7].map(|i| {
+                    NodeEntry { node: &children[i], span: spans[i].clone() }
+                });
+
+                Some(out)
             },
             _ => None,
         }
@@ -263,19 +254,14 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
         }
     }
 
-    pub fn into_inner_parts(self) -> Option<(&'a mut Option<I>, ArrayVec<[Self; 8]>)> {
-        match *self.node {
-            Octnode::SubTree { ref mut children, ref mut data } => {
+    pub fn into_inner_parts(self) -> Option<(&'a mut Option<I>, [Self; 8])> {
+        match self.node {
+            Octnode::SubTree { children, data } => {
                 let spans = create_spans(self.span);
-                let children = children
-                    .iter_mut()
-                    .zip(&spans)
-                    .map(|(child, span)| {
-                        NodeEntryMut {
-                            node: child,
-                            span: span.clone(),
-                        }
-                    }).collect();
+                let mut children = children.iter_mut();
+                let children = [0, 1, 2, 3, 4, 5, 6, 7].map(|i| {
+                    NodeEntryMut { node: children.next().unwrap(), span: spans[i].clone() }
+                });
 
                 Some((data, children))
             },
@@ -287,24 +273,19 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
     /// referencing all eight children of `n` are returned; `None` otherwise.
     ///
     /// This methods takes `self` because of borrowck limitations.
-    pub fn into_children(self) -> Option<ArrayVec<[Self; 8]>> {
+    pub fn into_children(self) -> Option<[Self; 8]> {
         // Warning: you can't change the `self` into a `&mut self` without
         // shortening the output lifetime! Don't waste time by trying! See:
         // http://stackoverflow.com/q/42397056/2408867
-        match *self.node {
-            Octnode::SubTree { ref mut children, .. } => {
+        match self.node {
+            Octnode::SubTree { children, .. } => {
                 let spans = create_spans(self.span);
-                Some(children
-                    .iter_mut()
-                    .zip(&spans)
-                    .map(|(child, span)| {
-                        NodeEntryMut {
-                            node: child,
-                            span: span.clone(),
-                        }
-                    })
-                    .collect()
-                )
+                let mut children = children.iter_mut();
+                let out = [0, 1, 2, 3, 4, 5, 6, 7].map(|i| {
+                    NodeEntryMut { node: children.next().unwrap(), span: spans[i].clone() }
+                });
+
+                Some(out)
             },
             _ => None,
         }
@@ -313,8 +294,6 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
     /// Splits the `self` leaf into eight children and returns the data of
     /// the split leaf. *Note*: the referenced node has to be a leaf!
     pub fn split(&mut self, data: Option<I>) -> Option<L> {
-        use std::iter;
-
         assert!(self.is_leaf());
 
         let out = match *self.node {
@@ -322,17 +301,9 @@ impl<'a, L, I> NodeEntryMut<'a, L, I> {
             _ => unreachable!(),
         };
 
-        // Sadly, `Octnode` is not `Copy`, so we can't simply create the array
-        // by saying `[Leaf(None); 8]`. Therefore we generate it with this
-        // iterator thingy.
-        let empty_children: ArrayVec<_> = iter::repeat(())
-            .map(|_| Octnode::Leaf(None))
-            .take(8)
-            .collect();
-
         *self.node = Octnode::SubTree {
-            children: Box::new(empty_children.into_inner().ok().unwrap()),
-            data: data,
+            children: Box::new([Octnode::Leaf(None); 8]),
+            data,
         };
 
         out

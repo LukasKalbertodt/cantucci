@@ -1,7 +1,7 @@
 
 pub fn cube(size: u32) -> CubeIter {
     CubeIter {
-        size: size,
+        size,
         x: 0,
         y: 0,
         z: 0,
@@ -44,7 +44,7 @@ impl Iterator for CubeIter {
 
 pub fn square(size: u32) -> SquareIter {
     SquareIter {
-        size: size,
+        size,
         x: 0,
         y: 0,
     }

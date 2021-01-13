@@ -1,52 +1,29 @@
-// We apparently need this for `error-chain`
-#![recursion_limit = "1024"]
+#![feature(array_value_iter, array_map, const_in_array_repeat_expressions)]
+#![feature(or_patterns)]
 
-#[macro_use] extern crate error_chain;
-#[macro_use] extern crate glium;
-#[macro_use] extern crate log;
-extern crate arrayvec;
-extern crate cgmath;
-extern crate env_logger;
-extern crate num_cpus;
-extern crate term_painter;
-extern crate threadpool;
-
-
+#[macro_use] mod util;
 mod app;
+mod prelude;
 mod camera;
 mod control;
-mod env;
-mod errors;
 mod event;
 mod math;
 mod mesh;
 mod octree;
 mod shape;
-mod util;
+mod sky;
+mod wgpu;
 
 
 fn main() {
-    use app::App;
-    use std::cmp::min;
-    use term_painter::Color::*;
-    use term_painter::ToStyle;
-
     // Init logger implementation
-    env_logger::init().expect("failed to initialize logger");
+    env_logger::init();
 
     // Create whole app and run it, if it succeeds
-    let res = App::init().and_then(|mut app| app.run());
+    let res = futures::executor::block_on(app::run());
 
     // Pretty print error chain
-    if let Err(error_chain) = res {
-        println!("Something went wrong ☹ ! Here is the backtrace:");
-        for (i, e) in error_chain.iter().enumerate() {
-            println!(
-                "{: >2$} {}",
-                Yellow.paint(if i == 0 { "→" } else { "⤷" }),
-                Red.paint(e),
-                2 * min(i, 7) + 1,
-            );
-        }
+    if let Err(e) = res {
+        eprintln!("Cantucci error: {:?}", e);
     }
 }

@@ -1,10 +1,11 @@
-use glium::glutin::Event;
-use glium::glutin::VirtualKeyCode;
+use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
-use camera::{Camera, Projection};
-use math::*;
-use shape::Shape;
-use event::{EventHandler, EventResponse};
+use crate::{
+    camera::{Camera, Projection},
+    event::{EventHandler, EventResponse},
+    math::lerp,
+    shape::Shape,
+};
 
 mod fly;
 mod orbit;
@@ -25,10 +26,10 @@ pub trait CamControl: EventHandler {
 
     /// Is called regularly to update the internal camera. `delta` is the time
     /// in seconds since the last time this method was called.
-    fn update(&mut self, _delta: f32, _shape: &Shape) {}
+    fn update(&mut self, _delta: f32, _shape: &dyn Shape) {}
 
     /// Returns `self` as `EventHandler` trait object.
-    fn as_event_handler(&mut self) -> &mut EventHandler;
+    fn as_event_handler(&mut self) -> &mut dyn EventHandler;
 
     /// Adjusts the internal camera to match the given one as close as
     /// possible (it might not be completely possible). This is used for
@@ -59,9 +60,9 @@ pub struct KeySwitcher<A, B> {
 impl<A: CamControl, B: CamControl> KeySwitcher<A, B> {
     pub fn new(first: A, second: B, switch_key: VirtualKeyCode) -> Self {
         KeySwitcher {
-            first: first,
-            second: second,
-            switch_key: switch_key,
+            first,
+            second,
+            switch_key,
             first_active: true,
             amount_first: 1.0,
         }
@@ -69,13 +70,19 @@ impl<A: CamControl, B: CamControl> KeySwitcher<A, B> {
 }
 
 impl<A: CamControl, B: CamControl> EventHandler for KeySwitcher<A, B> {
-    fn handle_event(&mut self, e: &Event) -> EventResponse {
-        use glium::glutin::ElementState;
-
+    fn handle_event(&mut self, e: &Event<()>) -> EventResponse {
         match e {
-            &Event::KeyboardInput(ElementState::Pressed, _, Some(key))
-                if key == self.switch_key =>
-            {
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput {
+                        virtual_keycode: Some(key),
+                        state: ElementState::Pressed,
+                        ..
+                    },
+                    ..
+                },
+                ..
+            } if *key == self.switch_key => {
                 match self.first_active {
                     true => {
                         self.second.match_view(&self.first.camera());
@@ -132,7 +139,7 @@ impl<A: CamControl, B: CamControl> CamControl for KeySwitcher<A, B> {
         }
     }
 
-    fn update(&mut self, delta: f32, shape: &Shape) {
+    fn update(&mut self, delta: f32, shape: &dyn Shape) {
         const TRANSITION_DURATION: f32 = 0.3;
 
         self.amount_first += (delta / TRANSITION_DURATION) * if self.first_active {
@@ -140,7 +147,7 @@ impl<A: CamControl, B: CamControl> CamControl for KeySwitcher<A, B> {
         } else {
             -1.0
         };
-        self.amount_first = clamp(self.amount_first, 0.0, 1.0);
+        self.amount_first = self.amount_first.clamp(0.0, 1.0);
 
         match self.first_active {
             true => self.first.update(delta, shape),
@@ -148,7 +155,7 @@ impl<A: CamControl, B: CamControl> CamControl for KeySwitcher<A, B> {
         }
     }
 
-    fn as_event_handler(&mut self) -> &mut EventHandler {
+    fn as_event_handler(&mut self) -> &mut dyn EventHandler {
         self
     }
 

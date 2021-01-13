@@ -1,9 +1,12 @@
-use glium::glutin::Event;
+use cgmath::{prelude::*, Point3, Rad, Vector3};
+use winit::event::{Event, KeyboardInput, WindowEvent};
 
-use camera::{Camera, Projection};
-use math::*;
-use shape::Shape;
-use event::{EventHandler, EventResponse};
+use crate::{
+    camera::{Camera, Projection},
+    math::lerp,
+    shape::Shape,
+    event::{EventHandler, EventResponse},
+};
 use super::CamControl;
 
 /// This describes the maximum speed (per seconds) in which theta can change.
@@ -48,7 +51,7 @@ impl Orbit {
         let distance = 3.0;
 
         Orbit {
-            origin: origin,
+            origin,
             cam: Camera::new(origin + -(init_dir * distance), init_dir, proj),
             theta_speed: Rad(0.0),
             theta_accel: Rad(0.0),
@@ -76,17 +79,17 @@ impl CamControl for Orbit {
         &mut self.cam.projection
     }
 
-    fn update(&mut self, delta: f32, _: &Shape) {
+    fn update(&mut self, delta: f32, _: &dyn Shape) {
         // Update the theta and phi turning speeds
         self.theta_speed = lerp(
             self.theta_speed,
             self.theta_accel * MAX_TURN_SPEED.0,
-            (1.0 - 2.0f32.powf(-delta / TURN_DELAY)),
+            1.0 - 2.0f32.powf(-delta / TURN_DELAY),
         );
         self.phi_speed = lerp(
             self.phi_speed,
             self.phi_accel * MAX_TURN_SPEED.0 * 2.0,
-            (1.0 - 2.0f32.powf(-delta / TURN_DELAY)),
+            1.0 - 2.0f32.powf(-delta / TURN_DELAY),
         );
 
         // Update actual turning position with those calculates speeds and
@@ -104,7 +107,7 @@ impl CamControl for Orbit {
         self.update_distance(new_distance);
     }
 
-    fn as_event_handler(&mut self) -> &mut EventHandler {
+    fn as_event_handler(&mut self) -> &mut dyn EventHandler {
         self
     }
 
@@ -116,12 +119,21 @@ impl CamControl for Orbit {
 }
 
 impl EventHandler for Orbit {
-    fn handle_event(&mut self, e: &Event) -> EventResponse {
-        // We are only interested in keyboard input ...
-        if let Event::KeyboardInput(state, _, Some(key)) = *e {
-            use glium::glutin::ElementState::*;
-            use glium::glutin::VirtualKeyCode as Vkc;
+    fn handle_event(&mut self, e: &Event<()>) -> EventResponse {
+        use winit::event::{ElementState::*, VirtualKeyCode as Vkc};
 
+        // We are only interested in keyboard input ...
+        if let Event::WindowEvent {
+            event: WindowEvent::KeyboardInput {
+                input: KeyboardInput {
+                    state,
+                    virtual_keycode: Some(key),
+                    ..
+                },
+                ..
+            },
+            ..
+        } = e {
             match (state, key) {
                 // Update accelerations for turning
                 (Pressed,  Vkc::Up) | (Released, Vkc::Down) if self.theta_accel <= Rad(0.0)
@@ -134,11 +146,15 @@ impl EventHandler for Orbit {
                     => self.phi_accel -= Rad(1.0),
 
                 // Update zoom speed
-                (Released, Vkc::Add) | (Pressed, Vkc::Subtract) |
-                (Released, Vkc::Equals) | (Pressed, Vkc::Minus) if self.zoom_speed <= 0.0
+                (Released, Vkc::Plus)
+                | (Released, Vkc::NumpadAdd)
+                | (Pressed, Vkc::NumpadSubtract)
+                | (Pressed, Vkc::Minus) if self.zoom_speed <= 0.0
                     => self.zoom_speed += ZOOM_SPEED,
-                (Pressed, Vkc::Add) | (Released, Vkc::Subtract) |
-                (Pressed, Vkc::Equals) | (Released, Vkc::Minus) if self.zoom_speed >= 0.0
+                (Pressed, Vkc::Plus)
+                | (Pressed, Vkc::NumpadAdd)
+                | (Released, Vkc::NumpadSubtract)
+                | (Released, Vkc::Minus) if self.zoom_speed >= 0.0
                     => self.zoom_speed -= ZOOM_SPEED,
 
                 _ => return EventResponse::NotHandled,
