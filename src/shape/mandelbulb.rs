@@ -256,8 +256,8 @@ unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
     // this.
     let (xs, ys, zs, ws) = {
         let x2_x4_y2_y4 = _mm_unpacklo_ps(p2, p4);
-        let z2_z4_w2_w4 = _mm_unpacklo_ps(p6, p8);
-        let x6_x8_y6_y8 = _mm_unpackhi_ps(p2, p4);
+        let x6_x8_y6_y8 = _mm_unpacklo_ps(p6, p8);
+        let z2_z4_w2_w4 = _mm_unpackhi_ps(p2, p4);
         let z6_z8_w6_w8 = _mm_unpackhi_ps(p6, p8);
 
         (
@@ -318,12 +318,9 @@ unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
             0b1111_0001,
         );
 
-        // Create a register where `y8` is in the lowest component and
-        // everything else is 0.
-        let t0_0_0_y8 = _mm_castsi128_ps(
-            _mm_srli_si128(_mm_castps_si128(ys), 12)
-        );
-        _mm_cvtss_f32(_mm_sub_ps(tmp, t0_0_0_y8))
+
+        let y8 = f32::from_bits(_mm_extract_ps(ys, 3) as u32);
+        _mm_cvtss_f32(tmp) - y8
     };
 
     // `ytmp` is a scalar caculated as:
@@ -332,7 +329,7 @@ unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
     //         +1 * x6 * 1     +
     //         -7 * x4 * y2    +
     //         +7 * x2 * y4    +
-    //         -1 * 1  * y6    +
+    //         -1 * 1  * y6
     //     )
     let ytmp = {
         let x6_x4_x2_x2 = _mm_permute_ps(xs, 0b10_01_00_00);
@@ -347,7 +344,7 @@ unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
         // Multiply with y. Since `tmp` has 0 in every position except the
         // second, the non second elements in the other factor don't matter.
         let tmp = _mm_mul_ps(tmp, p);
-        let tmp = f32::from_bits(_mm_extract_ps(tmp, 2) as u32);
+        let tmp = f32::from_bits(_mm_extract_ps(tmp, 1) as u32);
         let x = _mm_cvtss_f32(p);
 
         x * tmp
@@ -363,8 +360,8 @@ unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
         let z = f32::from_bits(_mm_extract_ps(p, 2) as u32);
         let z2 = _mm_cvtss_f32(zs);
         let z4 = f32::from_bits(_mm_extract_ps(zs, 1) as u32);
-        let w2 = _mm_cvtss_f32(w2_everywhere);
-        let w4 = f32::from_bits(_mm_extract_ps(w2_everywhere, 1) as u32);
+        let w2 = _mm_cvtss_f32(ws);
+        let w4 = f32::from_bits(_mm_extract_ps(ws, 1) as u32);
 
         z * w2.sqrt()
             * (z2 - w2)
