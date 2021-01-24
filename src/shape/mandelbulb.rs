@@ -80,11 +80,13 @@ impl<const P: u8> Shape for Mandelbulb<P> {
         let mut r = 0.0;
 
         for _ in 0..self.max_iters {
+            // TODO: this here should return the magnitude² as we need it ...
             r = z.magnitude();
             if r > self.bailout {
                 break;
             }
 
+            // ... here in the ^7 thingy.
             dr = r.powi(P as i32 - 1) * (P as f32) * dr + 1.0;
             z = rotate::<P>(z) + p;
         }
@@ -113,95 +115,109 @@ fn rotate<const P: u8>(p: Vec3) -> Vec3 {
     // Handle special case (general formula is not able to handle points on
     // the z axis).
     if p.is_on_z_axis() {
-        let old_radius = p.magnitude();
-        let theta = (p.z() / old_radius).acos();
-
-        // Scale and rotate the point
-        let new_radius = old_radius.powi(P.into());
-        let theta = theta * P as f32;
-
-        // Convert back to cartesian coordinates
-        return Vec3::new(0.0, 0.0, new_radius * theta.cos());
+        return rotate_on_z_axis::<P>(p);
     }
 
 
     // For some integer powers there are formulas without trigonometric
     // functions. This improves performance a lot (see #17).
     match P {
-        8 => {
-            let x = p.x();
-            let y = p.y();
-            let z = p.z();
-
-            let x2 = x.powi(2);
-            let x4 = x.powi(4);
-            let x6 = x.powi(6);
-            let x8 = x.powi(8);
-
-            let y2 = y.powi(2);
-            let y4 = y.powi(4);
-            let y6 = y.powi(6);
-            let y8 = y.powi(8);
-
-            let z2 = z.powi(2);
-            let z4 = z.powi(4);
-            let z6 = z.powi(6);
-            let z8 = z.powi(8);
-
-            let rxy2 = x2 + y2;
-            let rxy4 = rxy2.powi(2);
-            let rxy6 = rxy2.powi(3);
-            let rxy8 = rxy2.powi(4);
-
-            let a = 1.0 + (
-                z8
-                - 28.0 * z6 * rxy2
-                + 70.0 * z4 * rxy4
-                - 28.0 * z2 * rxy6
-            ) / rxy8;
-
-
-            Vec3::new(
-                a * (
-                    x8
-                    - 28.0 * x6 * y2
-                    + 70.0 * x4 * y4
-                    - 28.0 * x2 * y6
-                    - y8
-                ),
-                8.0 * a * x * y * (
-                    x6
-                    - 7.0 * x4 * y2
-                    + 7.0 * x2 * y4
-                    - y6
-                ),
-                8.0 * z
-                    * rxy2.sqrt()
-                    * (z2 - rxy2)
-                    * (z4 - 6.0 * z2 * rxy2 + rxy4),
-            )
-        }
-        power => {
-            let old_radius = p.magnitude();
-
-            // Convert to spherical coordinates
-            let theta = (p.z() / old_radius).acos();
-            let phi = f32::atan2(p.y(), p.x());
-
-            // Scale and rotate the point
-            let new_radius = old_radius.powi(power.into());
-            let theta = theta * power as f32;
-            let phi = phi * power as f32;
-
-            // Convert back to cartesian coordinates
-            new_radius * Vec3::new(
-                theta.sin() * phi.cos(),
-                phi.sin() * theta.sin(),
-                theta.cos(),
-            )
-        }
+        8 => rotate_inner_p8_serial(p),
+        _ => rotate_inner_px_generic::<P>(p),
     }
 }
+
+#[inline(never)]
+#[cold]
+fn rotate_on_z_axis<const P: u8>(p: Vec3) -> Vec3 {
+    let old_radius = p.magnitude();
+    let theta = (p.z() / old_radius).acos();
+
+    // Scale and rotate the point
+    let new_radius = old_radius.powi(P.into());
+    let theta = theta * P as f32;
+
+    // Convert back to cartesian coordinates
+    Vec3::new(0.0, 0.0, new_radius * theta.cos())
+}
+
+fn rotate_inner_px_generic<const P: u8>(p: Vec3) -> Vec3 {
+    let old_radius = p.magnitude();
+
+    // Convert to spherical coordinates
+    let theta = (p.z() / old_radius).acos();
+    let phi = f32::atan2(p.y(), p.x());
+
+    // Scale and rotate the point
+    let new_radius = old_radius.powi(P.into());
+    let theta = theta * P as f32;
+    let phi = phi * P as f32;
+
+    // Convert back to cartesian coordinates
+    new_radius * Vec3::new(
+        theta.sin() * phi.cos(),
+        phi.sin() * theta.sin(),
+        theta.cos(),
+    )
+}
+
+fn rotate_inner_p8_serial(p: Vec3) -> Vec3 {
+    let x = p.x();
+    let y = p.y();
+    let z = p.z();
+
+    let x2 = x.powi(2);
+    let x4 = x.powi(4);
+    let x6 = x.powi(6);
+    let x8 = x.powi(8);
+
+    let y2 = y.powi(2);
+    let y4 = y.powi(4);
+    let y6 = y.powi(6);
+    let y8 = y.powi(8);
+
+    let z2 = z.powi(2);
+    let z4 = z.powi(4);
+    let z6 = z.powi(6);
+    let z8 = z.powi(8);
+
+    let rxy2 = x2 + y2;
+    let rxy4 = rxy2.powi(2);
+    let rxy6 = rxy2.powi(3);
+    let rxy8 = rxy2.powi(4);
+
+    let a = 1.0 + (
+        z8
+        - 28.0 * z6 * rxy2
+        + 70.0 * z4 * rxy4
+        - 28.0 * z2 * rxy6
+    ) / rxy8;
+
+
+    Vec3::new(
+        a * (
+            x8
+            - 28.0 * x6 * y2
+            + 70.0 * x4 * y4
+            - 28.0 * x2 * y6
+            - y8
+        ),
+        8.0 * a * x * y * (
+            x6
+            - 7.0 * x4 * y2
+            + 7.0 * x2 * y4
+            - y6
+        ),
+        8.0 * z
+            * rxy2.sqrt()
+            * (z2 - rxy2)
+            * (z4 - 6.0 * z2 * rxy2 + rxy4),
+    )
+}
+
+// fn rotate_inner_p8_simd<const P: u8>(p: Vec3) -> Vec3 {
+// }
+
 
 
 /// A 3D vector stored in a 128bit SIMD register.
@@ -275,5 +291,30 @@ impl Mul<Vec3> for f32 {
     type Output = Vec3;
     fn mul(self, other: Vec3) -> Vec3 {
         other * self
+    }
+}
+
+#[cfg(test)]
+mod bench {
+    use test::{Bencher, black_box};
+    use super::Vec3;
+    use super::super::BENCH_POINTS;
+
+    #[bench]
+    fn rotate_inner_generic(b: &mut Bencher) {
+        b.iter(|| {
+            for &[x, y, z] in &BENCH_POINTS {
+                black_box(super::rotate_inner_px_generic::<8>(Vec3::new(x, y, z)));
+            }
+        });
+    }
+
+    #[bench]
+    fn rotate_inner_p8_serial(b: &mut Bencher) {
+        b.iter(|| {
+            for &[x, y, z] in &BENCH_POINTS {
+                black_box(super::rotate_inner_p8_serial(Vec3::new(x, y, z)));
+            }
+        });
     }
 }
