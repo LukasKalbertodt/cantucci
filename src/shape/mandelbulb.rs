@@ -162,7 +162,7 @@ fn rotate_inner_px_generic<const P: u8>(p: Vec3) -> Vec3 {
     )
 }
 
-fn rotate_inner_p8_serial(p: Vec3) -> Vec3 {
+fn rotate_inner_p8_scalar(p: Vec3) -> Vec3 {
     let x = p.x();
     let y = p.y();
     let z = p.z();
@@ -216,6 +216,7 @@ fn rotate_inner_p8_serial(p: Vec3) -> Vec3 {
     )
 }
 
+#[inline(never)]
 unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
     use core::arch::x86_64::*;
 
@@ -474,10 +475,19 @@ mod bench {
     }
 
     #[bench]
-    fn rotate_inner_p8_serial(b: &mut Bencher) {
+    fn rotate_inner_p8_scalar(b: &mut Bencher) {
         b.iter(|| {
             for &[x, y, z] in &BENCH_POINTS {
-                black_box(super::rotate_inner_p8_serial(Vec3::new(x, y, z)));
+                black_box(super::rotate_inner_p8_scalar(Vec3::new(x, y, z)));
+            }
+        });
+    }
+
+    #[bench]
+    fn rotate_inner_p8_simd(b: &mut Bencher) {
+        b.iter(|| {
+            for &[x, y, z] in &BENCH_POINTS {
+                black_box(unsafe { super::rotate_inner_p8_simd(Vec3::new(x, y, z)) });
             }
         });
     }
