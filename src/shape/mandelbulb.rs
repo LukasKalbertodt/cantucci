@@ -122,7 +122,8 @@ fn rotate<const P: u8>(p: Vec3) -> Vec3 {
     // For some integer powers there are formulas without trigonometric
     // functions. This improves performance a lot (see #17).
     match P {
-        8 => rotate_inner_p8_serial(p),
+        // 8 => rotate_inner_p8_serial(p),
+        8 => unsafe { rotate_inner_p8_simd(p) },
         _ => rotate_inner_px_generic::<P>(p),
     }
 }
@@ -215,8 +216,174 @@ fn rotate_inner_p8_serial(p: Vec3) -> Vec3 {
     )
 }
 
-// fn rotate_inner_p8_simd<const P: u8>(p: Vec3) -> Vec3 {
-// }
+unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
+    use core::arch::x86_64::*;
+
+    let p = p.0;
+
+    // We first calculate a bunch of powers of x, y, z and (x² + y²). The last
+    // value we define as "w²". To be precise, we need:
+    //
+    //       x  x²  x⁴  x⁶  x⁸
+    //       y  y²  y⁴  y⁶  y⁸
+    //       z  z²  z⁴  z⁶  z⁸
+    //       -  w²  w⁴  w⁶  w⁸
+    // var = p  p2  p4  p6  p8
+    //
+    //
+    // We will calculate higher powers by multiplying. (x, y, z) is stored in
+    // `p`. The subsequent powers will be stored in p2, p4, p6 and p8. The
+    // highest component of these SIMD vectors will be wⁿ (except in p).
+
+    // w² = x² + y² (In every position)
+    let w2_everywhere = _mm_dp_ps(p, p, 0b0011_1111);
+
+    // First simply multiply p with itself to get x², y² and z². Then we set the
+    // highest component of `p2` to w² by bitwise or. In the line above we made
+    // sure that the dest mask of `_mm_dp_ps` writes to the highest component.
+    // All other are 0.
+    let p2 = _mm_mul_ps(p, p);
+    let p2 = _mm_blend_ps(p2, w2_everywhere, 0b1000);
+
+    // Time to create the other powers.
+    let p4 = _mm_mul_ps(p2, p2);
+    let p6 = _mm_mul_ps(p4, p2);
+    let p8 = _mm_mul_ps(p4, p4);
+
+    // For later caculations it is beneficial to have all xs, ys, zs and ws in
+    // one vector. So what we do here is basically a 4x4 matrix transpose. We do
+    // this with the powers 2, 4, 6, 8. The original `p` is not involved in
+    // this.
+    let (xs, ys, zs, ws) = {
+        let x2_x4_y2_y4 = _mm_unpacklo_ps(p2, p4);
+        let z2_z4_w2_w4 = _mm_unpacklo_ps(p6, p8);
+        let x6_x8_y6_y8 = _mm_unpackhi_ps(p2, p4);
+        let z6_z8_w6_w8 = _mm_unpackhi_ps(p6, p8);
+
+        (
+            _mm_movelh_ps(x2_x4_y2_y4, x6_x8_y6_y8),
+            _mm_movehl_ps(x6_x8_y6_y8, x2_x4_y2_y4),
+            _mm_movelh_ps(z2_z4_w2_w4, z6_z8_w6_w8),
+            _mm_movehl_ps(z6_z8_w6_w8, z2_z4_w2_w4),
+        )
+    };
+
+    // Some constants we need.
+    let ones = _mm_set1_ps(1.0); // Four 1.0
+    let const_1_n28_70_n28 = _mm_set_ps(1.0, -28.0, 70.0, -28.0);
+
+    // Calculate temporary value `a`. The value is stored in the lowest two
+    // components of the register, the highest two registers are 1.0. The value
+    // of a is calculated like this:
+    //
+    //     a = 1.0 + sum(
+    //         + 1.0 * z8 * (1.0 / w8)       // [96..127]
+    //         -28.0 * z6 * (w2  / w8)       // [64..95]
+    //         +70.0 * z4 * (w4  / w8)       // [32..63]
+    //         -28.0 * z2 * (w6  / w8)       // [0..31]
+    //     )
+    //
+    // To do this efficiently, we calculate `temp` by preparing three vectors,
+    // multiplying two of them and then calculating the dot product of that
+    // result with the third.
+    let a = {
+        let tmp = _mm_dp_ps(
+            _mm_mul_ps(const_1_n28_70_n28, zs),
+            _mm_div_ps(ones, ws),
+            0b1111_0011,
+        );
+
+        _mm_add_ps(ones, tmp)
+    };
+
+
+    // Some values for the calculations below.
+    let c1_y2_y4_y6 = {
+        let y2_y2_y4_y6 = _mm_permute_ps(ys, 0b00_00_01_10);
+        _mm_blend_ps(y2_y2_y4_y6, ones, 0b1000)
+    };
+
+    // `xtmp` is a scalar caculated as:
+    //
+    //     xtmp = -y8 +
+    //         + 1 * x8 * 1    +
+    //         -28 * x6 * y2   +
+    //         +70 * x4 * y4   +
+    //         -28 * x2 * y6
+    //
+    let xtmp = {
+        let tmp = _mm_dp_ps(
+            _mm_mul_ps(const_1_n28_70_n28, xs),
+            c1_y2_y4_y6,
+            0b1111_0001,
+        );
+
+        // Create a register where `y8` is in the lowest component and
+        // everything else is 0.
+        let t0_0_0_y8 = _mm_castsi128_ps(
+            _mm_srli_si128(_mm_castps_si128(ys), 12)
+        );
+        _mm_cvtss_f32(_mm_sub_ps(tmp, t0_0_0_y8))
+    };
+
+    // `ytmp` is a scalar caculated as:
+    //
+    //     ytmp = x * y * (
+    //         +1 * x6 * 1     +
+    //         -7 * x4 * y2    +
+    //         +7 * x2 * y4    +
+    //         -1 * 1  * y6    +
+    //     )
+    let ytmp = {
+        let x6_x4_x2_x2 = _mm_permute_ps(xs, 0b10_01_00_00);
+        let x6_x4_x2_c1 = _mm_blend_ps(x6_x4_x2_x2, ones, 0b0001);
+
+        let tmp = _mm_dp_ps(
+            _mm_mul_ps(c1_y2_y4_y6, x6_x4_x2_c1),
+            _mm_set_ps(1.0, -7.0, 7.0, -1.0),
+            0b1111_0010,
+        );
+
+        // Multiply with y. Since `tmp` has 0 in every position except the
+        // second, the non second elements in the other factor don't matter.
+        let tmp = _mm_mul_ps(tmp, p);
+        let tmp = f32::from_bits(_mm_extract_ps(tmp, 2) as u32);
+        let x = _mm_cvtss_f32(p);
+
+        x * tmp
+    };
+
+    // `ztmp` is a scalar caculated as:
+    //
+    //     ztmp = z
+    //         * w
+    //         * (z2 - w²)
+    //         * (z4 - 6.0 * z2 * w² + w⁴),
+    let ztmp = {
+        let z = f32::from_bits(_mm_extract_ps(p, 2) as u32);
+        let z2 = _mm_cvtss_f32(zs);
+        let z4 = f32::from_bits(_mm_extract_ps(zs, 1) as u32);
+        let w2 = _mm_cvtss_f32(w2_everywhere);
+        let w4 = f32::from_bits(_mm_extract_ps(w2_everywhere, 1) as u32);
+
+        z * w2.sqrt()
+            * (z2 - w2)
+            * (z4 - 6.0 * z2 * w2 + w4)
+    };
+
+    // Caculate the final result. It is caculated as:
+    //
+    //     z = 8 * 1 * ztmp
+    //     y = 8 * a * ytmp
+    //     x = 1 * a * xtmp
+    let xyztmp = _mm_set_ps(0.0, ztmp, ytmp, xtmp);
+    Vec3(
+        _mm_mul_ps(
+            _mm_mul_ps(xyztmp, a),
+            _mm_set_ps(0.0, 8.0, 8.0, 1.0),
+        )
+    )
+}
 
 
 
