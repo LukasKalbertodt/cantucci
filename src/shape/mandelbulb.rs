@@ -122,8 +122,8 @@ fn rotate<const P: u8>(p: Vec3) -> Vec3 {
     // For some integer powers there are formulas without trigonometric
     // functions. This improves performance a lot (see #17).
     match P {
-        // 8 => rotate_inner_p8_serial(p),
-        8 => unsafe { rotate_inner_p8_simd(p) },
+        8 => rotate_inner_p8_scalar(p),
+        // 8 => unsafe { rotate_inner_p8_simd(p) },
         _ => rotate_inner_px_generic::<P>(p),
     }
 }
@@ -216,7 +216,7 @@ fn rotate_inner_p8_scalar(p: Vec3) -> Vec3 {
     )
 }
 
-#[inline(never)]
+#[allow(dead_code)]
 unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
     use core::arch::x86_64::*;
 
