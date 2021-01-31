@@ -1,24 +1,7 @@
-#![cfg(
-    all(
-        any(target_arch = "x86", target_arch = "x86_64"),
-        target_feature = "sse4.1"
-    )
-)]
-
-use std::{arch::x86_64::{
-        __m128,
-        _mm_set_ps,
-        _mm_dp_ps,
-        _mm_cvtss_f32,
-        _mm_sqrt_ss,
-        _mm_sub_ps,
-        _mm_test_all_zeros,
-        _mm_set_epi32,
-        _mm_castps_si128,
-        _mm_extract_ps,
-        _mm_mul_ps,
-        _mm_add_ps,
-    }, ops::{Add, Mul, Range, Sub}};
+use std::{
+    arch::x86_64::*,
+    ops::{Add, Mul, Range, Sub},
+};
 use cgmath::Point3;
 
 use super::Shape;
@@ -216,6 +199,10 @@ fn rotate_inner_p8_scalar(p: Vec3) -> Vec3 {
     )
 }
 
+#[cfg(all(
+    target_arch = "x86_64",
+    target_feature = "sse4.1"
+))]
 #[allow(dead_code)]
 unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
     use core::arch::x86_64::*;
@@ -391,6 +378,7 @@ unsafe fn rotate_inner_p8_simd(p: Vec3) -> Vec3 {
 #[derive(Debug, Clone, Copy)]
 struct Vec3(__m128);
 
+#[cfg(target_arch = "x86_64")]
 impl Vec3 {
     #[inline(always)]
     fn new(x: f32, y: f32, z: f32) -> Self {
@@ -413,6 +401,13 @@ impl Vec3 {
         unsafe { f32::from_bits(_mm_extract_ps(self.0, 2) as u32) }
     }
 
+}
+
+#[cfg(all(
+    target_arch = "x86_64",
+    target_feature = "sse4.1"
+))]
+impl Vec3 {
     #[inline(always)]
     fn magnitude(self) -> f32 {
         unsafe {
@@ -428,6 +423,22 @@ impl Vec3 {
             let mask = _mm_set_epi32(0, 0, 0x7FFF_FFFF, 0x7FFF_FFFF);
             _mm_test_all_zeros(_mm_castps_si128(self.0), mask) == 1
         }
+    }
+}
+
+#[cfg(all(
+    target_arch = "x86_64",
+    not(target_feature = "sse4.1")
+))]
+impl Vec3 {
+    #[inline(always)]
+    fn magnitude(self) -> f32 {
+        (self.x().powi(2) + self.y().powi(2) + self.z().powi(2)).sqrt()
+    }
+
+    #[inline(always)]
+    fn is_on_z_axis(self) -> bool {
+        self.x() == 0.0 && self.y() == 0.0
     }
 }
 
@@ -483,6 +494,10 @@ mod bench {
         });
     }
 
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "sse4.1"
+    ))]
     #[bench]
     fn rotate_inner_p8_simd(b: &mut Bencher) {
         b.iter(|| {
