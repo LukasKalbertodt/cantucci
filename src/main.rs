@@ -1,5 +1,8 @@
 #![feature(array_value_iter, array_map, const_in_array_repeat_expressions)]
 #![feature(or_patterns)]
+#![feature(test)]
+
+extern crate test;
 
 #[macro_use] mod util;
 mod app;
